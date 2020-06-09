@@ -54,6 +54,24 @@ result = query:Sum();
 -- result: 12
 ```
 
+Use another enumerable as parameter:
+
+```lua
+local first = {1, 2, 3, 4, 5};
+local second = List.New({6, 7, 8});
+
+local query = Enumerable.From(first):Concat(second);
+
+local result;
+
+result = query:ToArray();
+-- result: {1, 2, 3, 4, 5, 6, 7, 8}
+
+second:Add(9);
+result = query:ToArray();
+-- result: {1, 2, 3, 4, 5, 6, 7, 8, 9}
+```
+
 ### Limitations
 
 It is not possible to call Linq methods directly on a table object, so this will throw an error:
@@ -61,16 +79,6 @@ It is not possible to call Linq methods directly on a table object, so this will
 ```lua
 local t = {1, 2, 3};
 t:Sum(); -- Error
-```
-
-Currently when an operation expects an array as argument it cannot get an enumberable instead:
-
-```lua
--- This works:
-local list1 = List.New({1, 2, 3});
-
--- But this doesn't:
-local list2 = List.New(list1);
 ```
 
 ## Usage

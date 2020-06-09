@@ -239,6 +239,21 @@ describe("Saving a query", function()
         assert.same({4}, query:Skip(1):Take(1):ToArray());
         assert.same(12, query:Sum());
     end);
+
+    it("reuse the enumerable with its new state", function()
+        local first = {1, 2, 3, 4, 5};
+        local second = List.New({6, 7, 8});
+        local third = List.New({10, 11, 12});
+        local except = List.New({3});
+
+        local query = Enumerable.From(first):Concat(second):Except(except):Union(third);
+        assert.same({1, 2, 4, 5, 6, 7, 8, 10, 11, 12}, query:ToArray());
+
+        second:Add(9);
+        third:Add(13);
+        except:Add(7);
+        assert.same({1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13}, query:ToArray());
+    end);
 end);
 
 -- =====================================================================================================================
@@ -334,6 +349,10 @@ describe("Enumerable:Concat", function()
 
     it("concatenates two filled sequences", function()
         assert.same({1, 2, 3, 3, 4, 5}, Enumerable.From({1, 2, 3}):Concat({3, 4, 5}):ToArray());
+    end);
+
+    it("concatenates with an enumerable", function()
+        assert.same({1, 2, 3, 3, 4, 5}, Enumerable.From({1, 2, 3}):Concat(Enumerable.From({3, 4, 5})):ToArray());
     end);
 end);
 
@@ -481,6 +500,13 @@ describe("Enumerable:Except", function()
         assert.same({2, 2.1, 2.4, 2.5}, Enumerable.From({2.0, 2.1, 2.2, 2.3, 2.4, 2.5}):Except({2.2, 2.3}):ToArray());
     end);
 
+    it("returns the set difference of the elements of two enumerables", function()
+        assert.same(
+            {2, 2.1, 2.4, 2.5},
+            Enumerable.From({2.0, 2.1, 2.2, 2.3, 2.4, 2.5}):Except(List.New({2.2, 2.3})):ToArray()
+        );
+    end);
+
     it("returns the set difference of the elements of two sequences according to the given comparer", function()
         local ignoreCaseComparer = function(fruit1, fruit2) return fruit1:lower() == fruit2:lower(); end
         assert.same({"apple", "kiwi"}, Enumerable.From({"apple", "banana", "peach", "kiwi"}):Except({"BANANA", "peach"}, ignoreCaseComparer):ToArray());
@@ -540,11 +566,19 @@ end);
 
 describe("Enumerable:GroupBy", function()
     it("returns a collection of elements where each element  contains a collection of objects and a key", function()
-        local pets = {{ Name = "Barley", Age = 8.3 }, { Name = "Boots", Age = 4.9 }, { Name = "Whiskers", Age = 1.5 }, { Name = "Daisy", Age = 4.3 }};
-        local groups = Enumerable.From(pets):GroupBy(
-            function(pet) return math.floor(pet.Age); end,
-            function(pet) return pet; end
-        ):ToArray();
+        local pets = {
+            { Name = "Barley", Age = 8.3 },
+            { Name = "Boots", Age = 4.9 },
+            { Name = "Whiskers", Age = 1.5 },
+            { Name = "Daisy", Age = 4.3 }
+        };
+
+        local groups = Enumerable.From(pets)
+            :GroupBy(
+                function(pet) return math.floor(pet.Age); end,
+                function(pet) return pet; end
+            )
+            :ToArray();
 
         assert.equal(3, #groups);
 
@@ -554,12 +588,20 @@ describe("Enumerable:GroupBy", function()
     end);
 
     it("returns a collection of elements where each element represents a projection over a group and its key", function()
-        local pets = {{ Name = "Barley", Age = 8.3 }, { Name = "Boots", Age = 4.9 }, { Name = "Whiskers", Age = 1.5 }, { Name = "Daisy", Age = 4.3 }};
-        local groups = Enumerable.From(pets):GroupBy(
-            function(pet) return math.floor(pet.Age); end,
-            function(pet) return pet.Age; end,
-            function(baseAge, allAges) return {Key = baseAge, Count = #allAges, Min = math.min(unpack(allAges)), Max = math.max(unpack(allAges))} end
-        ):ToArray();
+        local pets = {
+            { Name = "Barley", Age = 8.3 },
+            { Name = "Boots", Age = 4.9 },
+            { Name = "Whiskers", Age = 1.5 },
+            { Name = "Daisy", Age = 4.3 }
+        };
+
+        local groups = Enumerable.From(pets)
+            :GroupBy(
+                function(pet) return math.floor(pet.Age); end,
+                function(pet) return pet.Age; end,
+                function(baseAge, allAges) return {Key = baseAge, Count = #allAges, Min = math.min(unpack(allAges)), Max = math.max(unpack(allAges))} end
+            )
+            :ToArray();
 
         assert.equal(3, #groups);
 
@@ -569,13 +611,21 @@ describe("Enumerable:GroupBy", function()
     end);
 
     it("returns a collection of elements where each element represents a projection over a group and its key using a custom key comparer", function()
-        local pets = {{ Name = "Barley", Age = 8.3 }, { Name = "Boots", Age = 4.9 }, { Name = "Whiskers", Age = 1.5 }, { Name = "Daisy", Age = 4.3 }};
-        local groups = Enumerable.From(pets):GroupBy(
-            function(pet) return pet.Age; end,
-            function(pet) return pet.Age; end,
-            function(baseAge, allAges) return {Key = math.floor(baseAge), Count = #allAges, Min = math.min(unpack(allAges)), Max = math.max(unpack(allAges))} end,
-            function(age1, age2) return math.floor(age1) == math.floor(age2); end
-        ):ToArray();
+        local pets = {
+            { Name = "Barley", Age = 8.3 },
+            { Name = "Boots", Age = 4.9 },
+            { Name = "Whiskers", Age = 1.5 },
+            { Name = "Daisy", Age = 4.3 }
+        };
+
+        local groups = Enumerable.From(pets)
+            :GroupBy(
+                function(pet) return pet.Age; end,
+                function(pet) return pet.Age; end,
+                function(baseAge, allAges) return {Key = math.floor(baseAge), Count = #allAges, Min = math.min(unpack(allAges)), Max = math.max(unpack(allAges))} end,
+                function(age1, age2) return math.floor(age1) == math.floor(age2); end
+            )
+            :ToArray();
 
         assert.equal(3, #groups);
 
@@ -600,12 +650,14 @@ describe("Enumerable:GroupJoin", function()
         local people = { nopet, magnus, terry, charlotte };
         local pets = { barley, boots, whiskers, daisy };
 
-        local results = Enumerable.From(people):GroupJoin(
-            pets,
-            function(person) return person; end,
-            function(pet) return pet.Owner; end,
-            function(person, pets) return { OwnerName = person.Name, Pets = pets }; end
-        ):ToArray();
+        local results = Enumerable.From(people)
+            :GroupJoin(
+                pets,
+                function(person) return person; end,
+                function(pet) return pet.Owner; end,
+                function(person, pets) return { OwnerName = person.Name, Pets = pets }; end
+            )
+            :ToArray();
 
         assert.equal(4, #results);
 
@@ -629,13 +681,15 @@ describe("Enumerable:GroupJoin", function()
         local people = { magnus, terry1, charlotte };
         local pets = { barley, boots, whiskers, daisy };
 
-        local results = Enumerable.From(people):GroupJoin(
-            pets,
-            function(person) return person; end,
-            function(pet) return pet.Owner; end,
-            function(person, pets) return { OwnerName = person.Name, Pets = pets }; end,
-            function(outerKey, innerKey) return outerKey.Name == innerKey.Name; end
-        ):ToArray();
+        local results = Enumerable.From(people)
+            :GroupJoin(
+                pets,
+                function(person) return person; end,
+                function(pet) return pet.Owner; end,
+                function(person, pets) return { OwnerName = person.Name, Pets = pets }; end,
+                function(outerKey, innerKey) return outerKey.Name == innerKey.Name; end
+            )
+            :ToArray();
 
         assert.equal(3, #results);
 
@@ -652,11 +706,44 @@ describe("Enumerable:Intersect", function()
         assert.same({26, 30}, Enumerable.From(id1):Intersect(id2):ToArray());
     end);
 
+    it("returns the elements that appear in each of two enumerable", function()
+        local id1 = { 44, 26, 92, 30, 71, 38 };
+        local id2 = { 39, 59, 83, 47, 26, 4, 30 };
+        assert.same({26, 30}, Enumerable.From(id1):Intersect(Enumerable.From(id2)):ToArray());
+    end);
+
     it("returns the elements that appear in each of two sequences according to the comparer", function()
         local store1 = { { Name = "apple", Code = 9 }, { Name = "orange", Code = 4 } };
         local store2 = { { Name = "Apple", Code = 9 }, { Name = "lemon", Code = 12 } };
         local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         assert.same({{ Name = "apple", Code = 9 }}, Enumerable.From(store1):Intersect(store2, isSameProduct):ToArray());
+    end);
+end);
+
+describe("Enumerable:IsEnumerable", function()
+    it("returns true if the given object is an Enumerable", function()
+        assert.is_true(Enumerable.IsEnumerable(Enumerable.From({})));
+        assert.is_true(Enumerable.IsEnumerable(List.New()));
+        assert.is_true(Enumerable.IsEnumerable(Enumerable.Empty():ToHashSet()));
+    end);
+
+    it("returns false if the given object is not an Enumerable", function()
+        assert.is_false(Enumerable.IsEnumerable({}));
+        assert.is_false(Enumerable.IsEnumerable(1));
+        assert.is_false(Enumerable.IsEnumerable(nil));
+        assert.is_false(Enumerable.IsEnumerable(function() end));
+        assert.is_false(Enumerable.IsEnumerable("a"));
+        assert.is_false(Enumerable.IsEnumerable(true));
+    end);
+
+    it("returns true if the given object is not an Enumerable but implements the GetEnumerator function (unfortunately)", function()
+        -- Unfortunately, this will return true...
+        assert.is_true(Enumerable.IsEnumerable({GetEnumerator = Enumerable.GetEnumerator}));
+    end);
+
+    it("returns false if the given object is not an Enumerable that implements a wrong GetEnumerator", function()
+        -- ... but this will not
+        assert.is_false(Enumerable.IsEnumerable({GetEnumerator = function() end}));
     end);
 end);
 
@@ -678,6 +765,37 @@ describe("Enumerable:Join", function()
         local results = Enumerable.From(people)
             :Join(
                 pets,
+                function(person) return person; end,
+                function(pet) return pet.Owner; end,
+                function(person, pet) return { OwnerName = person.Name, PetName = pet.Name }; end
+            )
+            :ToArray();
+
+        assert.equal(4, #results);
+
+        assert.same({OwnerName = "Hedlund, Magnus", PetName = "Daisy"}, results[1]);
+        assert.same({OwnerName = "Adams, Terry", PetName = "Barley"}, results[2]);
+        assert.same({OwnerName = "Adams, Terry", PetName = "Boots"}, results[3]);
+        assert.same({OwnerName = "Weiss, Charlotte", PetName = "Whiskers"}, results[4]);
+    end);
+
+    it("joins two enumerables", function()
+        local nopet = { Name = "Pet, Without" };
+        local magnus = { Name = "Hedlund, Magnus" };
+        local terry = { Name = "Adams, Terry" };
+        local charlotte = { Name = "Weiss, Charlotte" };
+
+        local barley = { Name = "Barley", Owner = terry };
+        local boots = { Name = "Boots", Owner = terry };
+        local whiskers = { Name = "Whiskers", Owner = charlotte };
+        local daisy = { Name = "Daisy", Owner = magnus };
+
+        local people = { nopet, magnus, terry, charlotte };
+        local pets = { barley, boots, whiskers, daisy };
+
+        local results = Enumerable.From(people)
+            :Join(
+                Enumerable.From(pets),
                 function(person) return person; end,
                 function(pet) return pet.Owner; end,
                 function(person, pet) return { OwnerName = person.Name, PetName = pet.Name }; end
@@ -934,6 +1052,16 @@ describe("Enumerable:SequenceEqual", function()
         assert.is_true(Enumerable.From(pets1):SequenceEqual(pets2));
     end);
 
+    it("is true when both enumerables are equal", function()
+        local pet1 = { Name = "Turbo", Age = 2 };
+        local pet2 = { Name = "Peanut", Age = 8 };
+
+        local pets1 = { pet1, pet2 };
+        local pets2 = { pet1, pet2 };
+
+        assert.is_true(Enumerable.From(pets1):SequenceEqual(Enumerable.From(pets2)));
+    end);
+
     it("is false when both sequences are not equal", function()
         local pet1 = { Name = "Turbo", Age = 2 };
         local pet2 = { Name = "Peanut", Age = 8 };
@@ -1147,6 +1275,19 @@ describe("Enumerable:ToArray", function()
         assert.not_equal(input, result);
         assert.same({1, 2, 3, --[[nil,]] "a", "b", "c", {}, true, false}, result);
     end);
+
+    it("ignores the keys from the input table", function()
+        local input = {4, a = 1, b = 2, c = 3};
+        local array = Enumerable.From(input):ToArray();
+
+        assert.equal(4, array[1]);
+        assert.is_true(Enumerable.From(array):Contains(1));
+        assert.is_true(Enumerable.From(array):Contains(2));
+        assert.is_true(Enumerable.From(array):Contains(3));
+        assert.is_nil(array.a);
+        assert.is_nil(array.b);
+        assert.is_nil(array.c);
+    end);
 end);
 
 describe("Enumerable:ToHashSet", function()
@@ -1177,8 +1318,8 @@ describe("Enumerable:ToList", function()
     it("returns an instance of List", function()
         local input = {1, 2, 3, nil, "a", "b", "c", {}, true, false};
         local list = Enumerable.From(input):ToList();
-        assert.same(Linq.Enumerable.From, Enumerable.From);
-        assert.not_same(Linq.HashSet.New, Enumerable.From);
+        assert.same(Linq.List.New, list.New);
+        assert.not_same(Linq.HashSet.New, list.New);
     end);
 end);
 
@@ -1210,6 +1351,60 @@ end);
 --     end);
 -- end);
 
+describe("Enumerable:ToTable", function()
+    it("keeps the same keys from the input table", function()
+        local input = {4, a = 1, b = 2, c = 3};
+        local table = Enumerable.From(input):ToTable();
+
+        assert.equal(4, table[1]);
+        assert.equal(1, table.a);
+        assert.equal(2, table.b);
+        assert.equal(3, table.c);
+    end);
+
+    it("keeps the same keys from the input table after applying full-streaming operations", function()
+        local input = {4, a = 1, b = 2, c = 3};
+        local table = Enumerable.From(input)
+            :Where(function(n) return n >= 2; end)
+            :Select(function(n) return n * 2; end)
+            :ToTable();
+
+        assert.equal(8, table[1]);
+        assert.is_nil(table.a);
+        assert.equal(4, table.b);
+        assert.equal(6, table.c);
+    end);
+
+    it("adds an element with Append by incrementing the max index by 1", function()
+        local input = {4, a = 1, b = 2, c = 3, [6] = 5};
+        local table = Enumerable.From(input)
+            :Append("test")
+            :ToTable();
+
+        assert.equal(4, table[1]);
+        assert.equal(1, table.a);
+        assert.equal(2, table.b);
+        assert.equal(3, table.c);
+        assert.equal(5, table[6]);
+        assert.equal("test", table[7]);
+    end);
+
+    it("keeps the keys from the input table but not the keys of the concatenated table", function()
+        local input = {4, a = 1, b = 2, c = 3, [6] = 5};
+        local table = Enumerable.From(input)
+            :Concat({"test", a = 1})
+            :ToTable();
+
+        assert.equal(4, table[1]);
+        assert.equal(1, table.a);
+        assert.equal(2, table.b);
+        assert.equal(3, table.c);
+        assert.equal(5, table[6]);
+        assert.equal("test", table[7]);
+        assert.equal(1, table[8]);
+    end);
+end);
+
 describe("Enumerable:Where", function()
     it("filters out the elements according to the predicate", function()
         local input = {1, 2, 3, 4, 5};
@@ -1228,6 +1423,12 @@ describe("Enumerable:Union", function()
         assert.same({5, 3, 9, 7, 8, 6, 4, 1, 0}, Enumerable.From(ints1):Union(ints2):ToArray());
     end);
 
+    it("produces the set union of two enumerables", function()
+        local ints1 = { 5, 3, 9, 7, 5, 9, 3, 7 };
+        local ints2 = { 8, 3, 6, 4, 4, 9, 1, 0 };
+        assert.same({5, 3, 9, 7, 8, 6, 4, 1, 0}, Enumerable.From(ints1):Union(Enumerable.From(ints2)):ToArray());
+    end);
+
     it("produces the set union of two sequences according to the given comparer", function()
         local store1 = { { Name = "apple", Code = 9 }, { Name = "orange", Code = 4 } };
         local store2 = { { Name = "apple", Code = 9 }, { Name = "lemon", Code = 12 }, { Name = "peach", Code = 4 } };
@@ -1241,6 +1442,12 @@ describe("Enumerable:Zip", function()
         local numbers = { 1, 2, 3 };
         local words = { "one", "two", "three" };
         assert.same({{1, "one"}, {2, "two"}, {3, "three"}} , Enumerable.From(numbers):Zip(words):ToArray());
+    end);
+
+    it("produces a sequence of tuples with elements from the two specified enumerables", function()
+        local numbers = { 1, 2, 3 };
+        local words = { "one", "two", "three" };
+        assert.same({{1, "one"}, {2, "two"}, {3, "three"}} , Enumerable.From(numbers):Zip(Enumerable.From(words)):ToArray());
     end);
 
     it("applies the specified function to the corresponding elements of the two sequences", function()

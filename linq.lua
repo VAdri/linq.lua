@@ -97,6 +97,7 @@ function Enumerable:Concat(second)
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local finished = false;
         local appending = false;
@@ -119,7 +120,7 @@ function Enumerable:Concat(second)
             end
 
             if (appending) then
-                key2, value2 = next(second, key2);
+                key2, value2 = secondNext(second, key2);
                 if (key2 ~= nil) then
                     maxIndex = maxIndex + 1;
                     return maxIndex, value2;
@@ -196,17 +197,17 @@ end
 --- @return Enumerable @An {@see Enumerable} that contains the set difference of the elements of two sequences.
 function Enumerable:Except(second, comparer)
     comparer = comparer or equalityComparer;
-
     local getPrevIterator = self.getIterator;
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local secondArray = Enumerable.IsEnumerable(second) and second:ToArray() or second;
 
         return function()
             local key, value = getNext();
             while (key ~= nil) do
                 local ignore = false;
-                for _, exceptValue in pairs(second) do
+                for _, exceptValue in pairs(secondArray) do
                     if (comparer(exceptValue, value)) then
                         -- This is a restricted value
                         ignore = true;
@@ -303,17 +304,17 @@ end
 --- @return Enumerable @An {@see Enumerable} that contains the elements that form the set intersection of two sequences.
 function Enumerable:Intersect(second, comparer)
     comparer = comparer or equalityComparer;
-
     local getPrevIterator = self.getIterator;
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local secondArray = Enumerable.IsEnumerable(second) and second:ToArray() or second;
 
         return function()
             local key, value = getNext();
             while (key ~= nil) do
                 local ignore = true;
-                for _, exceptValue in pairs(second) do
+                for _, exceptValue in pairs(secondArray) do
                     if (comparer(exceptValue, value)) then
                         -- This value is included
                         ignore = false;
@@ -348,13 +349,14 @@ function Enumerable:Join(inner, outerKeySelector, innerKeySelector, resultSelect
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local innerArray = Enumerable.IsEnumerable(inner) and inner:ToArray() or inner;
 
         local index = 0;
         local joined = {};
         local key, outerValue = getNext();
         return function()
             while (key ~= nil) do
-                for _, innerValue in pairs(inner) do
+                for _, innerValue in pairs(innerArray) do
                     if (not joined[innerValue] and comparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
                         -- Return the result and keep the same outerValue for next iteration
                         index = index + 1;
@@ -620,6 +622,7 @@ function Enumerable:Union(second, comparer)
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
         local appending = false;
@@ -641,7 +644,7 @@ function Enumerable:Union(second, comparer)
                 end
 
                 if (appending) then
-                    keySecond, value = next(second, keySecond);
+                    keySecond, value = secondNext(second, keySecond);
                     if (keySecond ~= nil) then
                         if (set:Add(value)) then
                             index = index + 1;
@@ -669,12 +672,13 @@ function Enumerable:Zip(second, resultSelector)
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local index = 0;
         local keySecond, valueSecond;
         return function()
             local key, value = getNext();
-            keySecond, valueSecond = next(second, keySecond);
+            keySecond, valueSecond = secondNext(second, keySecond);
             if (key ~= nil and keySecond ~= nil) then
                 index = index + 1;
                 return index, resultSelector and resultSelector(value, valueSecond) or {value, valueSecond};
@@ -902,6 +906,8 @@ end
 function Enumerable:SequenceEqual(second, comparer)
     comparer = comparer or equalityComparer;
 
+    second = Enumerable.IsEnumerable(second) and second:ToTable() or second;
+
     for key, item in self:GetEnumerator() do if (not comparer(item, second[key])) then return false; end end
 
     return true;
@@ -987,7 +993,7 @@ function Enumerable:Sum(transform)
     return sum;
 end
 
---- Creates an array.
+--- Creates an index-value pairs array. The index starts at 1 and is incremented by 1 for each element.
 --- @return table @An array that contains the elements from the input sequence.
 function Enumerable:ToArray()
     local result = {};
@@ -1015,20 +1021,37 @@ function Enumerable:ToList()
     return Linq.List.New(self:ToArray());
 end
 
+--- Creates a key-value pairs table. Key order is unspecified.
+---
+--- This method tries to keep the same keys from the original table but this is not guaranteed depending on the operations that were executed previously.
+--- @return table @An array that contains the elements from the input sequence.
+function Enumerable:ToTable()
+    local result = {};
+    for key, item in self:GetEnumerator() do result[key] = item; end
+    return result;
+end
+
 -- =============
 -- == Statics ==
 -- =============
 
--- --- Returns an empty {@see Enumerable}.
--- --- @return Enumerable @An empty {@see Enumerable}.
+--- Returns an empty {@see Enumerable}.
+--- @return Enumerable @An empty {@see Enumerable}.
+function Enumerable.Empty() return Linq.ReadOnlyCollection.New(); end
+
+--- Returns an empty {@see Enumerable}.
+--- @return Enumerable @An empty {@see Enumerable}.
 function Enumerable.From(source)
     assert(type(source) == "table", "source is not an array.");
     return Linq.ReadOnlyCollection.New(source);
 end
 
---- Returns an empty {@see Enumerable}.
---- @return Enumerable @An empty {@see Enumerable}.
-function Enumerable.Empty() return Linq.ReadOnlyCollection.New(); end
+--- Determines whether an object is a valid {@see Enumerable}.
+--- @param object any @The object to evaluate.
+--- @return boolean @`true` if the given object is an {@see Enumerable}; otherwise, `false`.
+function Enumerable.IsEnumerable(object)
+    return type(object) == "table" and object.GetEnumerator == Enumerable.GetEnumerator;
+end
 
 --- Generates a sequence of integral numbers within a specified range.
 --- @param start number @The value of the first integer in the sequence.
