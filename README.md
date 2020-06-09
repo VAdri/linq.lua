@@ -32,6 +32,28 @@ local admittedSudents = grades
     :ToArray();
 ```
 
+Definig a query an executing it multiple times:
+
+```lua
+local query = List.New({1, 2, 3, 4, 5})
+    :Where(function(i) return i >= 2; end)
+    :Skip(1);
+
+local result;
+
+result = query:ToArray();
+-- result: {3, 4, 5}
+
+result = query:Reverse():ToArray();
+-- result: {5, 4, 3}
+
+result = query:Skip(1):Take(1):ToArray();
+-- result: {4}
+
+result = query:Sum();
+-- result: 12
+```
+
 ### Limitations
 
 It is not possible to call Linq methods directly on a table object, so this will throw an error:

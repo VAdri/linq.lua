@@ -61,28 +61,31 @@ local Enumerable = {};
 --- @param element any @The value to append to source.
 --- @return Enumerable @An {@see Enumerable} that ends with element.
 function Enumerable:Append(element)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local appended = false;
-    local maxIndex = 1;
-    local function iterator()
-        if (appended) then
-            -- We already reached the end of the sequence
-            return;
-        end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        local key, value = getNext();
-        if (key ~= nil) then
-            if type(key) == "number" and key > maxIndex then maxIndex = key + 1; end
-            return key, value;
-        else
-            appended = true;
-            return maxIndex, element;
+        local appended = false;
+        local maxIndex = 1;
+        return function()
+            if (appended) then
+                -- We already reached the end of the sequence
+                return;
+            end
+
+            local key, value = getNext();
+            if (key ~= nil) then
+                if type(key) == "number" and key > maxIndex then maxIndex = key + 1; end
+                return key, value;
+            else
+                appended = true;
+                return maxIndex, element;
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Concatenates two sequences.
@@ -90,41 +93,44 @@ end
 --- @param second table @The sequence to concatenate to the first sequence.
 --- @return Enumerable @An {@see Enumerable} that contains the concatenated elements of the two input sequences.
 function Enumerable:Concat(second)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local finished = false;
-    local appending = false;
-    local maxIndex = 1;
-    local key2, value2;
-    local function iterator()
-        if (finished) then
-            -- We already reached the end of both sequences
-            return;
-        end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        if (not appending) then
-            local key, value = getNext();
-            if (key ~= nil) then
-                if type(key) == "number" and key > maxIndex then maxIndex = key; end
-                return key, value;
-            else
-                appending = true;
+        local finished = false;
+        local appending = false;
+        local maxIndex = 1;
+        local key2, value2;
+        return function()
+            if (finished) then
+                -- We already reached the end of both sequences
+                return;
             end
-        end
 
-        if (appending) then
-            key2, value2 = next(second, key2);
-            if (key2 ~= nil) then
-                maxIndex = maxIndex + 1;
-                return maxIndex, value2;
-            else
-                finished = true;
+            if (not appending) then
+                local key, value = getNext();
+                if (key ~= nil) then
+                    if type(key) == "number" and key > maxIndex then maxIndex = key; end
+                    return key, value;
+                else
+                    appending = true;
+                end
+            end
+
+            if (appending) then
+                key2, value2 = next(second, key2);
+                if (key2 ~= nil) then
+                    maxIndex = maxIndex + 1;
+                    return maxIndex, value2;
+                else
+                    finished = true;
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Returns the elements of the specified sequence or the specified value in a singleton collection if the sequence is empty.
@@ -132,20 +138,23 @@ end
 --- @param defaultValue any @The value to return if the sequence is empty.
 --- @return Enumerable @An {@see Enumerable} that contains defaultValue if source is empty; otherwise, source.
 function Enumerable:DefaultIfEmpty(defaultValue)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local isEmpty = true;
-    local function iterator()
-        local key, value = getNext();
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        if (key == nil and isEmpty) then key, value = 1, defaultValue; end
+        local isEmpty = true;
+        return function()
+            local key, value = getNext();
 
-        isEmpty = false;
-        return key, value;
+            if (key == nil and isEmpty) then key, value = 1, defaultValue; end
+
+            isEmpty = false;
+            return key, value;
+        end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Returns distinct elements from a sequence by using the given comparer or the default equality comparer to compare values.
@@ -153,22 +162,25 @@ end
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains distinct elements from the source sequence.
 function Enumerable:Distinct(comparer)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            if (set:Add(value)) then
-                return key, value;
-            else
-                key, value = getNext();
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                if (set:Add(value)) then
+                    return key, value;
+                else
+                    key, value = getNext();
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Produces the set difference of two sequences.
@@ -185,31 +197,34 @@ end
 function Enumerable:Except(second, comparer)
     comparer = comparer or equalityComparer;
 
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            local ignore = false;
-            for _, exceptValue in pairs(second) do
-                if (comparer(exceptValue, value)) then
-                    -- This is a restricted value
-                    ignore = true;
-                    break
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                local ignore = false;
+                for _, exceptValue in pairs(second) do
+                    if (comparer(exceptValue, value)) then
+                        -- This is a restricted value
+                        ignore = true;
+                        break
+                    end
                 end
-            end
 
-            if (ignore) then
-                -- There is a restricted value, ignore this item an go to the next
-                key, value = getNext();
-            else
-                return key, value;
+                if (ignore) then
+                    -- There is a restricted value, ignore this item an go to the next
+                    key, value = getNext();
+                else
+                    return key, value;
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Groups the elements of a sequence according to a specified key selector function and creates a result value from each group and its key.
@@ -223,31 +238,30 @@ function Enumerable:GroupBy(keySelector, elementSelector, resultSelector, compar
     resultSelector = resultSelector or defaultGrouping;
     comparer = comparer or equalityComparer;
 
-    -- This is non-streaming so we need to get all the results first
-    local currentResults = self:_Iterate();
+    local function getIterator()
+        -- This is non-streaming so we need to process all the results first
+        local groups = {};
+        for _, value in self:GetEnumerator() do
+            local key = keySelector(value);
+            local element = elementSelector(value);
 
-    local groups = {};
-    for _, value in pairs(currentResults) do
-        local key = keySelector(value);
-        local element = elementSelector(value);
+            if (comparer ~= equalityComparer) then
+                -- Select the key using the comparer
+                for k, _ in pairs(groups) do if (comparer(k, key)) then key = k; end end
+            end
 
-        if (comparer ~= equalityComparer) then
-            -- Select the key using the comparer
-            for k, _ in pairs(groups) do if (comparer(k, key)) then key = k; end end
+            groups[key] = groups[key] or {};
+            table.insert(groups[key], element);
         end
 
-        groups[key] = groups[key] or {};
-        table.insert(groups[key], element);
+        local key, value = nil, nil;
+        return function()
+            key, value = next(groups, key);
+            if (key ~= nil) then return key, resultSelector(key, value); end
+        end
     end
 
-    local key, value = nil, nil;
-    local function iterator()
-        key, value = next(groups, key);
-        if (key ~= nil) then return key, resultSelector(key, value); end
-    end
-
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Correlates the elements of two sequences based on key equality and groups the results.
@@ -260,24 +274,27 @@ end
 function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultSelector, keyComparer)
     keyComparer = keyComparer or equalityComparer;
 
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local function iterator()
-        local key, outerValue = getNext();
-        if (key == nil) then return; end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        local join = {};
-        for _, innerValue in pairs(inner) do
-            if (keyComparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
-                table.insert(join, innerValue);
+        return function()
+            local key, outerValue = getNext();
+            if (key == nil) then return; end
+
+            local join = {};
+            for _, innerValue in pairs(inner) do
+                if (keyComparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
+                    table.insert(join, innerValue);
+                end
             end
-        end
 
-        return key, resultSelector(outerValue, join);
+            return key, resultSelector(outerValue, join);
+        end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Produces the set intersection of two sequences.
@@ -287,31 +304,34 @@ end
 function Enumerable:Intersect(second, comparer)
     comparer = comparer or equalityComparer;
 
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            local ignore = true;
-            for _, exceptValue in pairs(second) do
-                if (comparer(exceptValue, value)) then
-                    -- This value is included
-                    ignore = false;
-                    break
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                local ignore = true;
+                for _, exceptValue in pairs(second) do
+                    if (comparer(exceptValue, value)) then
+                        -- This value is included
+                        ignore = false;
+                        break
+                    end
                 end
-            end
 
-            if (ignore) then
-                -- There is no included value, ignore this item an go to the next
-                key, value = getNext();
-            else
-                return key, value;
+                if (ignore) then
+                    -- There is no included value, ignore this item an go to the next
+                    key, value = getNext();
+                else
+                    return key, value;
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Correlates the elements of two sequences based on matching keys.
@@ -324,89 +344,99 @@ end
 function Enumerable:Join(inner, outerKeySelector, innerKeySelector, resultSelector, comparer)
     comparer = comparer or equalityComparer;
 
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 0;
-    local joined = {};
-    local key, outerValue = getNext();
-    local function iterator()
-        while (key ~= nil) do
-            for _, innerValue in pairs(inner) do
-                if (not joined[innerValue] and comparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
-                    -- Return the result and keep the same outerValue for next iteration
-                    index = index + 1;
-                    joined[innerValue] = true;
-                    return index, resultSelector(outerValue, innerValue);
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        local index = 0;
+        local joined = {};
+        local key, outerValue = getNext();
+        return function()
+            while (key ~= nil) do
+                for _, innerValue in pairs(inner) do
+                    if (not joined[innerValue] and comparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
+                        -- Return the result and keep the same outerValue for next iteration
+                        index = index + 1;
+                        joined[innerValue] = true;
+                        return index, resultSelector(outerValue, innerValue);
+                    end
                 end
-            end
 
-            -- Nothing was returned so we can use the next outerValue
-            key, outerValue = getNext();
+                -- Nothing was returned so we can use the next outerValue
+                key, outerValue = getNext();
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Adds a value to the beginning of the sequence.
 --- @param element any @The value to prepend to source.
 --- @return Enumerable @An {@see Enumerable} that begins with element.
 function Enumerable:Prepend(element)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 1;
-    local prepended = false;
-    local function iterator()
-        if (prepended) then
-            local key, value = getNext();
-            if (key == nil) then return; end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-            index = index + 1;
-            return index, value;
-        else
-            prepended = true;
-            return 1, element;
+        local index = 1;
+        local prepended = false;
+        return function()
+            if (prepended) then
+                local key, value = getNext();
+                if (key == nil) then return; end
+
+                index = index + 1;
+                return index, value;
+            else
+                prepended = true;
+                return 1, element;
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Inverts the order of the elements in a sequence.
 --- @returns Enumerable @An {@see Enumerable} whose elements correspond to those of the input sequence in reverse order.
 function Enumerable:Reverse()
-    -- This is non-streaming so we need to get all the results first
-    local currentResults = self:_Iterate();
+    local function getIterator()
+        -- This is non-streaming so we need to get all the results first
+        local currentResults = self:ToArray();
 
-    local i = #currentResults;
-    local key = 0;
-    local function iterator()
-        if (i == 0) then return; end
-        local value = currentResults[i];
-        i = i - 1;
-        key = key + 1;
-        return key, value;
+        local i = #currentResults;
+        local key = 0;
+        return function()
+            if (i == 0) then return; end
+            local value = currentResults[i];
+            i = i - 1;
+            key = key + 1;
+            return key, value;
+        end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Projects each element of a sequence into a new form.
 --- @param selector function @A transform function to apply to each source element.
 --- @return Enumerable @An {@see Enumerable} whose elements are the result of invoking the transform function on each element of source.
 function Enumerable:Select(selector)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local function iterator()
-        local key, value = getNext();
-        if (key ~= nil) then return key, selector(value, key, self.source); end
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        return function()
+            local key, value = getNext();
+            if (key ~= nil) then return key, selector(value, key, self.source); end
+        end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Projects each element of a sequence and flattens the resulting sequences into one sequence.
@@ -416,150 +446,168 @@ end
 function Enumerable:SelectMany(collectionSelector, resultSelector)
     resultSelector = resultSelector or noTransform;
 
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 0;
-    local key, valueSource = getNext();
-    local collectionKey;
-    local function iterator()
-        while (key ~= nil) do
-            local collection = collectionSelector(valueSource, key, self.source);
-            local valueResult = nil;
-            collectionKey, valueResult = next(collection, collectionKey);
-            if (collectionKey ~= nil) then
-                index = index + 1;
-                return index, resultSelector(valueSource, valueResult);
-            end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-            if (collectionKey == nil) then
-                -- We go to the next item only if we have finished returning the collection
-                key, valueSource = getNext();
+        local index = 0;
+        local key, valueSource = getNext();
+        local collectionKey;
+        return function()
+            while (key ~= nil) do
+                local collection = collectionSelector(valueSource, key, self.source);
+                local valueResult = nil;
+                collectionKey, valueResult = next(collection, collectionKey);
+                if (collectionKey ~= nil) then
+                    index = index + 1;
+                    return index, resultSelector(valueSource, valueResult);
+                end
+
+                if (collectionKey == nil) then
+                    -- We go to the next item only if we have finished returning the collection
+                    key, valueSource = getNext();
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Bypasses a specified number of elements in a sequence and then returns the remaining elements.
 --- @param count number @The number of elements to skip before returning the remaining elements.
 --- @return Enumerable @An {@see Enumerable} that contains the elements that occur after the specified index in the input sequence.
 function Enumerable:Skip(count)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 1;
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            if (index > count) then
-                return key, value;
-            else
-                index = index + 1;
-                key, value = getNext();
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        local index = 1;
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                if (index > count) then
+                    return key, value;
+                else
+                    index = index + 1;
+                    key, value = getNext();
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Bypasses elements in a sequence as long as a specified condition is true and then returns the remaining elements.
 --- @param predicate number @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from the input sequence starting at the first element in the linear series that does not pass the test specified by `predicate`.
 function Enumerable:SkipWhile(predicate)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local skipping = true;
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            if (skipping) then
-                if (predicate(value, key, self.source)) then
-                    skipping = false;
-                else
-                    key, value = getNext();
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        local skipping = true;
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                if (skipping) then
+                    if (predicate(value, key, self.source)) then
+                        skipping = false;
+                    else
+                        key, value = getNext();
+                    end
                 end
-            end
 
-            if (not skipping) then return key, value; end
+                if (not skipping) then return key, value; end
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Returns a specified number of contiguous elements from the start of a sequence.
 --- @param count number @The number of elements to return.
 --- @return Enumerable @An {@see Enumerable} that contains the specified number of elements from the start of the input sequence.
 function Enumerable:Take(count)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 1;
-    local function iterator()
-        if (index > count) then return; end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        local key, value = getNext();
-        while (key ~= nil) do
-            if (index <= count) then
-                index = index + 1;
-                return key, value;
-            else
-                return;
+        local index = 1;
+        return function()
+            if (index > count) then return; end
+
+            local key, value = getNext();
+            while (key ~= nil) do
+                if (index <= count) then
+                    index = index + 1;
+                    return key, value;
+                else
+                    return;
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Returns elements from a sequence as long as a specified condition is true, and then skips the remaining elements.
 --- @param predicate number @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from the input sequence that occur before the element at which the test no longer passes.
 function Enumerable:TakeWhile(predicate)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local taking = true;
-    local function iterator()
-        if (not taking) then return; end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-        local key, value = getNext();
-        if (key ~= nil) then
-            if (not predicate(value, key, self.source)) then
-                taking = false;
-                return;
-            else
-                return key, value;
+        local taking = true;
+        return function()
+            if (not taking) then return; end
+
+            local key, value = getNext();
+            if (key ~= nil) then
+                if (not predicate(value, key, self.source)) then
+                    taking = false;
+                    return;
+                else
+                    return key, value;
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Filters a sequence of values based on a predicate.
 --- @param predicate function @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains elements from the input sequence that satify the condition.
 function Enumerable:Where(predicate)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local function iterator()
-        local key, value = getNext();
-        while (key ~= nil) do
-            if (predicate(value, key, self.source)) then
-                return key, value;
-            else
-                key, value = getNext();
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        return function()
+            local key, value = getNext();
+            while (key ~= nil) do
+                if (predicate(value, key, self.source)) then
+                    return key, value;
+                else
+                    key, value = getNext();
+                end
             end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Produces the set union of two sequences.
@@ -568,44 +616,47 @@ end
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from both input sequences, excluding duplicates.
 function Enumerable:Union(second, comparer)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
-    local appending = false;
-    local index = 0;
-    local keySecond;
-    local function iterator()
-        local key, value;
-        repeat
-            if (not appending) then
-                key, value = getNext();
-                if (key ~= nil) then
-                    if (set:Add(value)) then
-                        index = index + 1;
-                        return index, value;
-                    end
-                else
-                    appending = true;
-                end
-            end
+    local function getIterator()
+        local getNext = getPrevIterator();
 
-            if (appending) then
-                keySecond, value = next(second, keySecond);
-                if (keySecond ~= nil) then
-                    if (set:Add(value)) then
-                        index = index + 1;
-                        return index, value;
+        local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
+        local appending = false;
+        local index = 0;
+        local keySecond;
+        return function()
+            local key, value;
+            repeat
+                if (not appending) then
+                    key, value = getNext();
+                    if (key ~= nil) then
+                        if (set:Add(value)) then
+                            index = index + 1;
+                            return index, value;
+                        end
+                    else
+                        appending = true;
                     end
-                else
-                    -- We reached the end of both sequences
-                    return;
                 end
-            end
-        until (key == nil and keySecond == nil)
+
+                if (appending) then
+                    keySecond, value = next(second, keySecond);
+                    if (keySecond ~= nil) then
+                        if (set:Add(value)) then
+                            index = index + 1;
+                            return index, value;
+                        end
+                    else
+                        -- We reached the end of both sequences
+                        return;
+                    end
+                end
+            until (key == nil and keySecond == nil)
+        end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 --- Produces a sequence of tuples with elements from the two specified sequences.
@@ -614,21 +665,24 @@ end
 --- @param resultSelector function|nil @A function that specifies how to merge the elements from the two sequences, or `nil` to return the tuple.
 --- @return Enumerable @An {@see Enumerable} of tuples with elements taken from the first and second sequences, in that order, or apply the given function on the elements to produce the result.
 function Enumerable:Zip(second, resultSelector)
-    local getNext = self.pipeline[1];
+    local getPrevIterator = self.getIterator;
 
-    local index = 0;
-    local keySecond, valueSecond;
-    local function iterator()
-        local key, value = getNext();
-        keySecond, valueSecond = next(second, keySecond);
-        if (key ~= nil and keySecond ~= nil) then
-            index = index + 1;
-            return index, resultSelector and resultSelector(value, valueSecond) or {value, valueSecond};
+    local function getIterator()
+        local getNext = getPrevIterator();
+
+        local index = 0;
+        local keySecond, valueSecond;
+        return function()
+            local key, value = getNext();
+            keySecond, valueSecond = next(second, keySecond);
+            if (key ~= nil and keySecond ~= nil) then
+                index = index + 1;
+                return index, resultSelector and resultSelector(value, valueSecond) or {value, valueSecond};
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
-    return self;
+    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 end
 
 -- =========================
@@ -641,8 +695,6 @@ end
 --- @return any @The final accumulator value.
 function Enumerable:Aggregate(seed, func)
     for key, item in self:GetEnumerator() do seed = func(seed, item, key, self.source); end
-
-    self:_ResetPipeline();
     return seed;
 end
 
@@ -650,14 +702,8 @@ end
 --- @param predicate function @A function to test each element for a condition.
 --- @return boolean @`true` if every element of the source sequence passes the test in the specified predicate, or if the sequence is empty; otherwise, `false`.
 function Enumerable:All(predicate)
-    for key, item in self:GetEnumerator() do
-        if (not predicate(item, key, self.source)) then
-            self:_ResetPipeline();
-            return false;
-        end
-    end
+    for key, item in self:GetEnumerator() do if (not predicate(item, key, self.source)) then return false; end end
 
-    self:_ResetPipeline();
     return true;
 end
 
@@ -666,13 +712,9 @@ end
 --- @return boolean @`true` if any elements in the source sequence pass the test in the specified predicate; otherwise, `false`.
 function Enumerable:Any(predicate)
     for key, item in self:GetEnumerator() do
-        if (not predicate or predicate(item, key, self.source)) then
-            self:_ResetPipeline();
-            return true;
-        end
+        if (not predicate or predicate(item, key, self.source)) then return true; end
     end
 
-    self:_ResetPipeline();
     return false;
 end
 
@@ -686,7 +728,6 @@ function Enumerable:Average(selector)
         sum = sum + (selector and selector(item) or item);
     end
 
-    self:_ResetPipeline();
     return sum / count;
 end
 
@@ -696,14 +737,8 @@ end
 --- @return boolean @`true` if the source sequence contains an element that has the specified value; otherwise, `false`.
 function Enumerable:Contains(value, comparer)
     comparer = comparer or equalityComparer;
-    for _, item in self:GetEnumerator() do
-        if (comparer(value, item)) then
-            self:_ResetPipeline();
-            return true;
-        end
-    end
+    for _, item in self:GetEnumerator() do if (comparer(value, item)) then return true; end end
 
-    self:_ResetPipeline();
     return false;
 end
 
@@ -716,7 +751,6 @@ function Enumerable:Count(predicate)
     local count = 0;
     for key, item in self:GetEnumerator() do if (predicate(item, key, self.source)) then count = count + 1; end end
 
-    self:_ResetPipeline();
     return count;
 end
 
@@ -729,14 +763,11 @@ function Enumerable:ElementAt(index)
     local i = 1;
     for _, item in self:GetEnumerator() do
         if (i == index) then
-            self:_ResetPipeline();
             return item;
         else
             i = i + 1
         end
     end
-
-    self:_ResetPipeline();
 
     error("index must be lesser or equal to the number of elements in source.");
 end
@@ -751,14 +782,12 @@ function Enumerable:ElementAtOrDefault(index, defaultValue)
     local i = 1;
     for _, item in self:GetEnumerator() do
         if (i == index) then
-            self:_ResetPipeline();
             return item;
         else
             i = i + 1
         end
     end
 
-    self:_ResetPipeline();
     return defaultValue;
 end
 
@@ -771,13 +800,8 @@ function Enumerable:First(predicate)
     local hasElement = false;
     for key, item in self:GetEnumerator() do
         hasElement = true;
-        if (predicate(item, key, self.source)) then
-            self:_ResetPipeline();
-            return item;
-        end
+        if (predicate(item, key, self.source)) then return item; end
     end
-
-    self:_ResetPipeline();
 
     if (hasElement) then
         error("No element satisfy the condition.");
@@ -793,14 +817,8 @@ end
 function Enumerable:FirstOrDefault(defaultValue, predicate)
     predicate = predicate or alwaysTrue;
 
-    for key, item in self:GetEnumerator() do
-        if (predicate(item, key, self.source)) then
-            self:_ResetPipeline();
-            return item;
-        end
-    end
+    for key, item in self:GetEnumerator() do if (predicate(item, key, self.source)) then return item; end end
 
-    self:_ResetPipeline();
     return defaultValue;
 end
 
@@ -816,8 +834,6 @@ function Enumerable:Last(predicate)
         hasElement = true;
         if (predicate(item, key, self.source)) then lastKey, lastValue = key, item; end
     end
-
-    self:_ResetPipeline();
 
     if (lastKey ~= nil) then return lastValue; end
 
@@ -840,8 +856,6 @@ function Enumerable:LastOrDefault(defaultValue, predicate)
         if (predicate(item, key, self.source)) then lastKey, lastValue = key, item; end
     end
 
-    self:_ResetPipeline();
-
     if (lastKey ~= nil) then return lastValue; end
 
     return defaultValue;
@@ -858,8 +872,6 @@ function Enumerable:Max(transform)
         local value = transform(item);
         if (max == nil or value > max) then max = value; end
     end
-
-    self:_ResetPipeline();
 
     if (max == nil) then error("Sequence contains no elements"); end
 
@@ -878,8 +890,6 @@ function Enumerable:Min(transform)
         if (min == nil or value < min) then min = value; end
     end
 
-    self:_ResetPipeline();
-
     if (min == nil) then error("Sequence contains no elements"); end
 
     return min;
@@ -892,14 +902,8 @@ end
 function Enumerable:SequenceEqual(second, comparer)
     comparer = comparer or equalityComparer;
 
-    for key, item in self:GetEnumerator() do
-        if (not comparer(item, second[key])) then
-            self:_ResetPipeline();
-            return false;
-        end
-    end
+    for key, item in self:GetEnumerator() do if (not comparer(item, second[key])) then return false; end end
 
-    self:_ResetPipeline();
     return true;
 end
 
@@ -919,7 +923,6 @@ function Enumerable:Single(predicate)
                 hasResult = true;
                 result = item;
             else
-                self:_ResetPipeline();
                 if (predicate == alwaysTrue) then
                     error("The sequence contain more than one element.");
                 else
@@ -929,7 +932,6 @@ function Enumerable:Single(predicate)
         end
     end
 
-    self:_ResetPipeline();
     if (hasResult) then
         return result;
     elseif (hasElement) then
@@ -954,7 +956,6 @@ function Enumerable:SingleOrDefault(defaultValue, predicate)
                 hasResult = true;
                 result = item;
             else
-                self:_ResetPipeline();
                 if (predicate == alwaysTrue) then
                     error("The sequence contain more than one element.");
                 else
@@ -964,7 +965,6 @@ function Enumerable:SingleOrDefault(defaultValue, predicate)
         end
     end
 
-    self:_ResetPipeline();
     if (hasResult) then
         return result;
     else
@@ -984,15 +984,14 @@ function Enumerable:Sum(transform)
         sum = value and sum + value or sum;
     end
 
-    self:_ResetPipeline();
     return sum;
 end
 
 --- Creates an array.
 --- @return table @An array that contains the elements from the input sequence.
 function Enumerable:ToArray()
-    local result = self:_Iterate();
-    self:_ResetPipeline();
+    local result = {};
+    for _, item in self:GetEnumerator() do table.insert(result, item); end
     return result;
 end
 
@@ -1058,7 +1057,7 @@ end
 -- =============
 
 function Enumerable:_Enumerate()
-    local iterator = self.pipeline[1];
+    local iterator = self.getIterator();
 
     repeat
         local key, value = iterator();
@@ -1070,14 +1069,6 @@ function Enumerable:GetEnumerator()
     -- Using wrap and yield as an iterator: https://www.lua.org/pil/9.3.html
     return wrap(function() self:_Enumerate(); end);
 end
-
-function Enumerable:_Iterate()
-    local result = {};
-    for _, item in self:GetEnumerator() do table.insert(result, item); end
-    return result;
-end
-
-function Enumerable:_AddToPipeline(iterator) table.insert(self.pipeline, 1, iterator); end
 
 -- *********************************************************************************************************************
 -- ** OrderedEnumerable
@@ -1113,11 +1104,48 @@ function OrderedEnumerable:ThenBy(keySelector, comparer) comparer = comparer or 
 function OrderedEnumerable:ThenByDescending(keySelector, comparer) comparer = comparer or equalityComparer; end
 
 -- *********************************************************************************************************************
+-- ** ReadOnlyCollection
+-- *********************************************************************************************************************
+
+--- @class ReadOnlyCollection : OrderedEnumerable
+local ReadOnlyCollection = {};
+
+--- Initializes a new instance of the {@see ReadOnlyCollection} class.
+--- @param source table|nil
+--- @return ReadOnlyCollection @The new instance of {@see ReadOnlyCollection}.
+function ReadOnlyCollection.New(source)
+    assert(source == nil or type(source) == "table");
+
+    local collection = Mixin({}, ReadOnlyCollection);
+    collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end});
+
+    collection.source = source or {};
+
+    collection:_ArrayIterator();
+
+    return collection;
+end
+
+--- Iterates over all the elements in an array.
+function ReadOnlyCollection:_ArrayIterator()
+    local function getIterator()
+        local key, value;
+        return function()
+            key, value = next(self.source, key);
+            return key, value;
+        end
+    end
+
+    self.getIterator = getIterator;
+end
+
+-- *********************************************************************************************************************
 -- ** Export
 -- *********************************************************************************************************************
 
 Linq.Enumerable = Enumerable;
 Linq.OrderedEnumerable = OrderedEnumerable;
+Linq.ReadOnlyCollection = ReadOnlyCollection;
 Linq._Set = Set;
 
 return Linq;

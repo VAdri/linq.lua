@@ -1,49 +1,7 @@
 local Linq = require "linq";
 
--- *********************************************************************************************************************
--- ** ReadOnlyCollection
--- *********************************************************************************************************************
-
---- @class ReadOnlyCollection : OrderedEnumerable
-local ReadOnlyCollection = {};
-
--- Mixin(ReadOnlyCollection, Linq.OrderedEnumerable);
-
---- Initializes a new instance of the {@see ReadOnlyCollection} class.
----
---- @param source table|nil
---- @return ReadOnlyCollection @The new instance of {@see ReadOnlyCollection}.
-function ReadOnlyCollection.New(source)
-    assert(source == nil or type(source) == "table");
-
-    local collection = Mixin({}, ReadOnlyCollection);
-    collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key] end});
-
-    collection.source = source or {};
-
-    collection.pipeline = {};
-    collection:_ResetPipeline();
-
-    return collection;
-end
-
-function ReadOnlyCollection:_ResetPipeline()
-    wipe(self.pipeline);
-    self:_ArrayIterator(self);
-end
-
---- Iterates over all the elements in an array.
-function ReadOnlyCollection:_ArrayIterator()
-    assert(#self.pipeline == 0, "Invalid state for '_IterateSource': the pipeline must be empty.");
-
-    local key, value;
-    local function iterator()
-        key, value = next(self.source, key);
-        return key, value;
-    end
-
-    self:_AddToPipeline(iterator);
-end
+--- @type ReadOnlyCollection|OrderedEnumerable|Enumerable
+local ReadOnlyCollection = Linq.ReadOnlyCollection;
 
 -- *********************************************************************************************************************
 -- ** List
@@ -61,7 +19,7 @@ function List.New(source)
     assert(source == nil or type(source) == "table");
 
     local list = Mixin({}, List);
-    list = setmetatable(list, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key] end});
+    list = setmetatable(list, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end});
 
     list.Length = 0;
 
@@ -69,8 +27,7 @@ function List.New(source)
     list.source = {};
     for _, v in pairs(source or {}) do list:Add(v); end
 
-    list.pipeline = {};
-    list:_ResetPipeline();
+    list:_ArrayIterator();
 
     return list;
 end

@@ -8,8 +8,6 @@ require "list";
 --- @class HashSet : Enumerable
 local HashSet = {};
 
--- Mixin(HashSet, Linq.Enumerable);
-
 --- Initializes a new instance of the {@see HashSet} class.
 --- @param source table|nil @The collection whose elements are copied to the new set, or `nil` to start with an empty set.
 --- @param comparer function|nil @The function to use when comparing values in the set, or `nil` to use the default equality comparer.
@@ -18,7 +16,7 @@ function HashSet.New(source, comparer)
     assert(source == nil or type(source) == "table");
 
     local set = Mixin({}, HashSet);
-    set = setmetatable(set, {__index = function(t, key, ...) return Linq.Enumerable[key] end});
+    set = setmetatable(set, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 
     set.source = {};
 
@@ -27,44 +25,36 @@ function HashSet.New(source, comparer)
 
     for _, v in pairs(source or {}) do set:Add(v); end
 
-    set.pipeline = {};
-    set:_ResetPipeline();
+    set:_SetIterator();
 
     return set;
 end
 
---- For private use only.
-function HashSet:_ResetPipeline()
-    wipe(self.pipeline);
-    self:_SetIterator();
-end
-
 --- Iterates over all the elements in a set.
 function HashSet:_SetIterator()
-    assert(#self.pipeline == 0, "Invalid state for '_SetIterator': the pipeline must be empty.");
-
-    local index = 0;
-    local iterator;
-    local key, value;
-    if (self.comparer) then
-        -- With a comparer we are not using a real set (slower)
-        iterator = function()
-            key, value = next(self.source, key);
-            if (not key) then return; end
-            index = index + 1;
-            return index, value;
-        end
-    else
-        -- Without comparer we are using a real set (faster)
-        iterator = function()
-            key = next(self.source, key);
-            if (not key) then return; end
-            index = index + 1;
-            return index, key;
+    local function getIterator()
+        local index = 0;
+        local key, value;
+        if (self.comparer) then
+            -- With a comparer we are not using a real set (slower)
+            return function()
+                key, value = next(self.source, key);
+                if (not key) then return; end
+                index = index + 1;
+                return index, value;
+            end
+        else
+            -- Without comparer we are using a real set (faster)
+            return function()
+                key = next(self.source, key);
+                if (not key) then return; end
+                index = index + 1;
+                return index, key;
+            end
         end
     end
 
-    self:_AddToPipeline(iterator);
+    self.getIterator = getIterator;
 end
 
 --- For private use only.
