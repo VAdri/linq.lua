@@ -564,6 +564,23 @@ describe("Enumerable:FirstOrDefault", function()
     end);
 end);
 
+describe("Enumerable.From", function()
+    it("creates an enumerable using the given array as source", function()
+        local enumerable = Enumerable.From({1, 2, 3, 4});
+        assert.same({1, 2, 3, 4}, enumerable:ToArray());
+    end);
+
+    it("creates an enumerable using the given enumerable as source", function()
+        local enumerable = Enumerable.From(List.New({1, 2, 3, 4}));
+        assert.same({1, 2, 3, 4}, enumerable:ToArray());
+    end);
+
+    it("creates an enumerable that can be used with operations", function()
+        local enumerable = Enumerable.From({1, 2, a = 3, b = 4});
+        assert.same({2, 4, a = 6, b = 8}, enumerable:Select(function(n) return n * 2; end):ToTable());
+    end);
+end);
+
 describe("Enumerable:GroupBy", function()
     it("returns a collection of elements where each element  contains a collection of objects and a key", function()
         local pets = {
@@ -653,6 +670,37 @@ describe("Enumerable:GroupJoin", function()
         local results = Enumerable.From(people)
             :GroupJoin(
                 pets,
+                function(person) return person; end,
+                function(pet) return pet.Owner; end,
+                function(person, pets) return { OwnerName = person.Name, Pets = pets }; end
+            )
+            :ToArray();
+
+        assert.equal(4, #results);
+
+        assert.same({OwnerName = "Pet, Without", Pets = {}}, results[1]);
+        assert.same({OwnerName = "Hedlund, Magnus", Pets = {daisy}}, results[2]);
+        assert.same({OwnerName = "Adams, Terry", Pets = {barley, boots}}, results[3]);
+        assert.same({OwnerName = "Weiss, Charlotte", Pets = {whiskers}}, results[4]);
+    end);
+
+    it("joins two enumerables", function()
+        local nopet = { Name = "Pet, Without" };
+        local magnus = { Name = "Hedlund, Magnus" };
+        local terry = { Name = "Adams, Terry" };
+        local charlotte = { Name = "Weiss, Charlotte" };
+
+        local barley = { Name = "Barley", Owner = terry };
+        local boots = { Name = "Boots", Owner = terry };
+        local whiskers = { Name = "Whiskers", Owner = charlotte };
+        local daisy = { Name = "Daisy", Owner = magnus };
+
+        local people = { nopet, magnus, terry, charlotte };
+        local pets = { barley, boots, whiskers, daisy };
+
+        local results = Enumerable.From(people)
+            :GroupJoin(
+                Enumerable.From(pets),
                 function(person) return person; end,
                 function(pet) return pet.Owner; end,
                 function(person, pets) return { OwnerName = person.Name, Pets = pets }; end

@@ -24,6 +24,7 @@ function List.New(source)
     list.Length = 0;
 
     -- Shallow copy because we don't want to modify the source sequence
+    source = Linq.Enumerable.IsEnumerable(source) and source:ToTable() or source;
     list.source = {};
     for _, v in pairs(source or {}) do list:Add(v); end
 

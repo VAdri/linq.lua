@@ -23,6 +23,7 @@ function HashSet.New(source, comparer)
     set.Comparer = comparer;
     set.Length = 0;
 
+    source = Linq.Enumerable.IsEnumerable(source) and source:ToTable() or source;
     for _, v in pairs(source or {}) do set:Add(v); end
 
     set:_SetIterator();

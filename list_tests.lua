@@ -73,6 +73,23 @@ describe("List:Clear", function()
     end);
 end);
 
+describe("List.New", function()
+    it("creates an list using the given array as source", function()
+        local list = List.New({1, 2, 3, 4});
+        assert.same({1, 2, 3, 4}, list:ToArray());
+    end);
+
+    it("creates an list using the given enumerable as source", function()
+        local list = List.New(Linq.Enumerable.From({1, 2, 3, 4}));
+        assert.same({1, 2, 3, 4}, list:ToArray());
+    end);
+
+    it("creates an list that can be used with operations", function()
+        local list = List.New({1, 2, a = 3, b = 4});
+        assert.same({2, 4, 6, 8}, list:Select(function(n) return n * 2; end):ToTable());
+    end);
+end);
+
 describe("List:RemoveAt", function()
     it("removes an item at the specified index", function()
         local list = List.New({"a", 12, false, {}});

@@ -221,6 +221,23 @@ describe("HashSet:IntersectWith", function()
     end);
 end);
 
+describe("HashSet.New", function()
+    it("creates a hash set using the given array as source", function()
+        local hashSet = HashSet.New({1, 2, 3, 3});
+        assert.same({1, 2, 3}, hashSet:ToArray());
+    end);
+
+    it("creates a hash set using the given enumerable as source", function()
+        local hashSet = HashSet.New(Linq.Enumerable.From({1, 2, 3, 3}));
+        assert.same({1, 2, 3}, hashSet:ToArray());
+    end);
+
+    it("creates a hash set that can be used with operations", function()
+        local hashSet = HashSet.New({1, 2, a = 3, b = 3});
+        assert.same({2, 4, 6}, hashSet:Select(function(n) return n * 2; end):ToTable());
+    end);
+end);
+
 describe("HashSet:Remove", function()
     it("removes an item if it doesn't already exist", function()
         local empty = {};

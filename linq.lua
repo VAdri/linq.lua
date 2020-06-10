@@ -89,8 +89,7 @@ function Enumerable:Append(element)
 end
 
 --- Concatenates two sequences.
----
---- @param second table @The sequence to concatenate to the first sequence.
+--- @param second table|Enumerable @The sequence to concatenate to the first sequence.
 --- @return Enumerable @An {@see Enumerable} that contains the concatenated elements of the two input sequences.
 function Enumerable:Concat(second)
     local getPrevIterator = self.getIterator;
@@ -135,7 +134,6 @@ function Enumerable:Concat(second)
 end
 
 --- Returns the elements of the specified sequence or the specified value in a singleton collection if the sequence is empty.
----
 --- @param defaultValue any @The value to return if the sequence is empty.
 --- @return Enumerable @An {@see Enumerable} that contains defaultValue if source is empty; otherwise, source.
 function Enumerable:DefaultIfEmpty(defaultValue)
@@ -159,7 +157,6 @@ function Enumerable:DefaultIfEmpty(defaultValue)
 end
 
 --- Returns distinct elements from a sequence by using the given comparer or the default equality comparer to compare values.
----
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains distinct elements from the source sequence.
 function Enumerable:Distinct(comparer)
@@ -192,7 +189,7 @@ end
 ---
 --- This method returns those elements in first that don't appear in second. It doesn't return those elements in second that don't appear in first. Only unique elements are returned.
 ---
---- @param second table @A table whose elements that also occur in the first sequence will cause those elements to be removed from the returned sequence.
+--- @param second table|Enumerable @A table whose elements that also occur in the first sequence will cause those elements to be removed from the returned sequence.
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains the set difference of the elements of two sequences.
 function Enumerable:Except(second, comparer)
@@ -266,7 +263,7 @@ function Enumerable:GroupBy(keySelector, elementSelector, resultSelector, compar
 end
 
 --- Correlates the elements of two sequences based on key equality and groups the results.
---- @param inner table @The sequence to join to the first sequence.
+--- @param inner table|Enumerable @The sequence to join to the first sequence.
 --- @param outerKeySelector function @A function to extract the join key from each element of the first sequence.
 --- @param innerKeySelector function @A function to extract the join key from each element of the second sequence.
 --- @param resultSelector function @A function to create a result element from an element from the first sequence and a collection of matching elements from the second sequence.
@@ -279,13 +276,14 @@ function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultS
 
     local function getIterator()
         local getNext = getPrevIterator();
+        local innerArray = Enumerable.IsEnumerable(inner) and inner:ToArray() or inner;
 
         return function()
             local key, outerValue = getNext();
             if (key == nil) then return; end
 
             local join = {};
-            for _, innerValue in pairs(inner) do
+            for _, innerValue in pairs(innerArray) do
                 if (keyComparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
                     table.insert(join, innerValue);
                 end
@@ -299,7 +297,7 @@ function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultS
 end
 
 --- Produces the set intersection of two sequences.
---- @param second table @An array whose distinct elements that also appear in the first sequence will be returned.
+--- @param second table|Enumerable @An array whose distinct elements that also appear in the first sequence will be returned.
 --- @param comparer function|nil @A function to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains the elements that form the set intersection of two sequences.
 function Enumerable:Intersect(second, comparer)
@@ -336,7 +334,7 @@ function Enumerable:Intersect(second, comparer)
 end
 
 --- Correlates the elements of two sequences based on matching keys.
---- @param inner table @The sequence to join to the first sequence.
+--- @param inner table|Enumerable @The sequence to join to the first sequence.
 --- @param outerKeySelector function @A function to extract the join key from each element of the first sequence.
 --- @param innerKeySelector function @A function to extract the join key from each element of the second sequence.
 --- @param resultSelector function @A function to create a result element from two matching elements.
@@ -614,7 +612,7 @@ end
 
 --- Produces the set union of two sequences.
 ---
---- @param second table @An array whose distinct elements form the second set for the union.
+--- @param second table|Enumerable @An array whose distinct elements form the second set for the union.
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from both input sequences, excluding duplicates.
 function Enumerable:Union(second, comparer)
@@ -664,7 +662,7 @@ end
 
 --- Produces a sequence of tuples with elements from the two specified sequences.
 --- Applies the specified function, if provided, to the resulting tuples.
---- @param second table @The second sequence to merge.
+--- @param second table|Enumerable @The second sequence to merge.
 --- @param resultSelector function|nil @A function that specifies how to merge the elements from the two sequences, or `nil` to return the tuple.
 --- @return Enumerable @An {@see Enumerable} of tuples with elements taken from the first and second sequences, in that order, or apply the given function on the elements to produce the result.
 function Enumerable:Zip(second, resultSelector)
@@ -900,7 +898,7 @@ function Enumerable:Min(transform)
 end
 
 --- Determines whether two sequences are equal according to an equality comparer.
---- @param second table @An array to compare to the first sequence.
+--- @param second table|Enumerable @An array to compare to the first sequence.
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return boolean @`true` if the two source sequences are of equal length and their corresponding elements compare equal; otherwise, `false`.
 function Enumerable:SequenceEqual(second, comparer)
@@ -1039,7 +1037,8 @@ end
 --- @return Enumerable @An empty {@see Enumerable}.
 function Enumerable.Empty() return Linq.ReadOnlyCollection.New(); end
 
---- Returns an empty {@see Enumerable}.
+--- Returns an {@see Enumerable} using the given array.
+--- @param source table|Enumerable @The array to use to initialize the {@see Enumerable}.
 --- @return Enumerable @An empty {@see Enumerable}.
 function Enumerable.From(source)
     assert(type(source) == "table", "source is not an array.");
@@ -1142,6 +1141,7 @@ function ReadOnlyCollection.New(source)
     local collection = Mixin({}, ReadOnlyCollection);
     collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end});
 
+    source = Enumerable.IsEnumerable(source) and source:ToTable() or source;
     collection.source = source or {};
 
     collection:_ArrayIterator();
