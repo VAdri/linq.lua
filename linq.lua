@@ -1,9 +1,15 @@
-require "globals";
+local Linq;
+
+if (LibStub) then
+    local MAJOR, MINOR = "Linq", 1;
+    Linq = LibStub:NewLibrary(MAJOR, MINOR);
+else
+    require "globals";
+    Linq = {};
+end
 
 local wrap, yield = coroutine.wrap, coroutine.yield;
 local next = next;
-
-local Linq = {};
 
 -- *********************************************************************************************************************
 -- ** Helpers

@@ -1,4 +1,10 @@
-local Linq = require "linq";
+local Linq;
+
+if (LibStub) then
+    Linq = LibStub("Linq");
+else
+    Linq = require "linq";
+end
 
 --- @type ReadOnlyCollection|OrderedEnumerable|Enumerable
 local ReadOnlyCollection = Linq.ReadOnlyCollection;

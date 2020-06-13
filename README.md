@@ -6,81 +6,6 @@ LINQ (Language-Integrated Query) is a library integrated in the .NET framework t
 
 The aim is to keep an API that is close to the original and to use the same [deferred execution](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/classification-of-standard-query-operators-by-manner-of-execution#deferred) methods with CPU and memory usage efficiency in mind.
 
-## Features
-
-### Current features
-
-An API that is as close to the original as possible:
-
-- `Enumerable`
-- `OrderedEnumerable` (work in progress)
-- `Queryable` (todo)
-
-Implementation of the following types:
-
-- `ReadOnlyCollection`
-- `List`
-- `HashSet`
-- `Dictionary` (work in progress)
-
-Chaining operations on an enumerable objects:
-
-```lua
-local admittedSudents = grades
-    :Where(function (grade) return grade >= 80; end)
-    :Select(function (grade) return grade.Student.Name; end)
-    :ToArray();
-```
-
-Definig a query an executing it multiple times:
-
-```lua
-local query = List.New({1, 2, 3, 4, 5})
-    :Where(function(i) return i >= 2; end)
-    :Skip(1);
-
-local result;
-
-result = query:ToArray();
--- result: {3, 4, 5}
-
-result = query:Reverse():ToArray();
--- result: {5, 4, 3}
-
-result = query:Skip(1):Take(1):ToArray();
--- result: {4}
-
-result = query:Sum();
--- result: 12
-```
-
-Use another enumerable as parameter:
-
-```lua
-local first = {1, 2, 3, 4, 5};
-local second = List.New({6, 7, 8});
-
-local query = Enumerable.From(first):Concat(second);
-
-local result;
-
-result = query:ToArray();
--- result: {1, 2, 3, 4, 5, 6, 7, 8}
-
-second:Add(9);
-result = query:ToArray();
--- result: {1, 2, 3, 4, 5, 6, 7, 8, 9}
-```
-
-### Limitations
-
-It is not possible to call Linq methods directly on a table object, so this will throw an error:
-
-```lua
-local t = {1, 2, 3};
-t:Sum(); -- Error
-```
-
 ## Usage
 
 ### Basic usage
@@ -108,6 +33,37 @@ local admitted = scores
     :ToArray();
 
 -- admitted: {"Bob", "Cathy"}
+```
+
+You can also use [`LibStub`](https://www.wowace.com/projects/libstub) to use this library in an addon for the game World of Warcraft:
+
+```bash
+# MyAddon.toc
+
+## Interface: 80300
+## Title: MyAddon
+## Author: Draghos
+## Version: 0.0.1
+
+# Import linq.lua first
+Libs/Linq/linq.lua
+
+# Then import optional collections
+Libs/Linq/list.lua
+Libs/Linq/hashSet.lua
+
+# Lastly you can import the files in which you want to use Linq
+MyAddon.lua
+```
+
+```lua
+-- MyAddon.lua
+
+-- Import Linq using LibStub
+local Linq = LibStub("Linq");
+
+-- Use Enumerable and the collections you have imported
+local list = Linq.List.New(Linq.Enumerable.Range(1, 5));
 ```
 
 ### Type inference
@@ -157,6 +113,80 @@ local results = query:ToArray();
 -- results: {4, 5, 6}
 ```
 
+You can also extend and execute a query multiple times after declaring it:
+
+```lua
+local query = List.New({1, 2, 3, 4, 5})
+    :Where(function(i) return i >= 2; end)
+    :Skip(1);
+
+local result;
+
+result = query:ToArray();
+-- result: {3, 4, 5}
+
+result = query:Reverse():ToArray();
+-- result: {5, 4, 3}
+
+result = query:Skip(1):Take(1):ToArray();
+-- result: {4}
+
+result = query:Sum();
+-- result: 12
+```
+
+It is possible to use another enumerable as an argument for an operation:
+
+```lua
+local first = {1, 2, 3, 4, 5};
+local second = List.New({6, 7, 8});
+
+local query = Enumerable.From(first):Concat(second);
+
+local result;
+
+result = query:ToArray();
+-- result: {1, 2, 3, 4, 5, 6, 7, 8}
+
+second:Add(9);
+result = query:ToArray();
+-- result: {1, 2, 3, 4, 5, 6, 7, 8, 9}
+```
+
+### Using collections
+
+Several collections implementing the Linq operations are provided. Each type of collection has its pros and cons but all of them can be used as enumerables.
+
+#### ReadOnlyCollection
+
+This is the base collection that is used when calling a method like `Linq.Enumerable.From`.
+
+This `ReadOnlyCollection` takes a table as source and use it to perform operations but it is not possible to add, remove or modify items on it.
+
+#### List
+
+The `List` inherits from `ReadOnlyCollection` except that it uses a shallow copy of the source sequence and it contains some operations that allow to modify it. The source sequence is not modified by the actions performed on the list (for instance, when calling `list:Add(item)` it will add the item on the `list` instance but not on the table that was used to create the list).
+
+#### HashSet
+
+A `HashSet` is a collection that contains no duplicate items. The duplicate items are determined by using the equality operator (`==`) or by using a given function used as a comparator (but in this case it will be slower). The items in the set are in no particular order.
+
+This type provides some interesting mathematical methods to add or remove items such as set additions (unions) or substractions (excepts).
+
+#### Dictionary
+
+The `Dictionary` type is not yet implemented.
+
+### Limitations
+
+It is not possible to call Linq methods directly on a table object, so this will throw an error:
+
+```lua
+local t = {1, 2, 3};
+t:Sum(); -- Error
+Enumerable.From(t):Sum(); -- Use this instead
+```
+
 ## API
 
 ### Enumerable
@@ -179,6 +209,7 @@ local results = query:ToArray();
 | Except              |           |    X     |        |
 | First               |     X     |          |        |
 | FirstOrDefault      |     X     |          |        |
+| From                |           |          |   X    |
 | GroupBy             |           |    X     |        |
 | GroupJoin           |           |    X     |        |
 | Intersect           |           |    X     |        |

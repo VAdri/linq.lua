@@ -1,5 +1,10 @@
-local Linq = require "linq";
-require "list";
+local Linq;
+
+if (LibStub) then
+    Linq = LibStub("Linq");
+else
+    Linq = require "linq";
+end
 
 -- *********************************************************************************************************************
 -- ** HashSet
@@ -178,15 +183,15 @@ function HashSet:SymmetricExceptWith(other)
     else
         -- Mark items that could not be added and those that were added from the other set
         local addedFromOther = {};
-        local itemsToRemove = Linq.List.New();
+        local itemsToRemove = {};
         for _, value in pairs(other) do
             if (self:Add(value)) then
                 table.insert(addedFromOther, value);
             else
-                itemsToRemove:Add(value);
+                table.insert(itemsToRemove, value);
             end
         end
-        for _, value in pairs(itemsToRemove:Except(addedFromOther):ToArray()) do
+        for _, value in pairs(Linq.Enumerable.From(itemsToRemove):Except(addedFromOther):ToArray()) do
             -- Removes only items taht are marked as itemsToRemove but not addedFromOther
             self:Remove(value);
         end

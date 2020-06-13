@@ -5,6 +5,7 @@
         // World of Warctaft API
         "Mixin",
         "wipe",
+        "LibStub",
 
         // busted API
         "describe",
