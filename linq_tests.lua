@@ -1055,8 +1055,22 @@ end);
 describe("Enumerable:Select", function()
     it("projects each element of a sequence into a new form", function()
         local fruits = { "apple", "banana", "mango", "orange", "passionfruit", "grape" };
-        local results = Enumerable.From(fruits):Select(function(item, index) return {index = index, str = item:sub(1, index - 1)}; end):ToArray();
-        assert.same({{ index = 1, str = "" }, { index = 2, str = "b" }, { index = 3, str = "ma" }, { index = 4, str = "ora" }, { index = 5, str = "pass" }, { index = 6, str = "grape" }}, results);
+
+        local results = Enumerable.From(fruits)
+            :Select(function(item, index) return {index = index, str = item:sub(1, index - 1)}; end)
+            :ToArray();
+
+        assert.same(
+            {
+                { index = 1, str = "" },
+                { index = 2, str = "b" },
+                { index = 3, str = "ma" },
+                { index = 4, str = "ora" },
+                { index = 5, str = "pass" },
+                { index = 6, str = "grape" }
+            },
+            results
+        );
     end);
 end);
 
@@ -1069,10 +1083,29 @@ describe("Enumerable:SelectMany", function()
             { Name = "Hines", Pets = { "Dusty" } }
         };
 
-        local results = Enumerable.From(petOwners):SelectMany(
-            function(petOwner) return petOwner.Pets; end,
-            function(petOwner, petName) return { Owner = petOwner.Name, Pet = petName }; end
-        ):ToArray();
+        local results = Enumerable.From(petOwners)
+            :SelectMany(
+                function(petOwner) return petOwner.Pets; end
+            )
+            :ToArray();
+
+        assert.same({ "Scruffy", "Sam", "Walker", "Sugar", "Scratches", "Diesel", "Dusty" }, results);
+    end);
+
+    it("projects each element of a sequence and flattens the resulting sequences into one sequence using the given merger function", function()
+        local petOwners = {
+            { Name = "Higa", Pets = { "Scruffy", "Sam" } },
+            { Name = "Ashkenazi", Pets = { "Walker", "Sugar" } },
+            { Name = "Price", Pets = { "Scratches", "Diesel" } },
+            { Name = "Hines", Pets = { "Dusty" } }
+        };
+
+        local results = Enumerable.From(petOwners)
+            :SelectMany(
+                function(petOwner) return petOwner.Pets; end,
+                function(petOwner, petName) return { Owner = petOwner.Name, Pet = petName }; end
+            )
+            :ToArray();
 
         assert.same(
             {

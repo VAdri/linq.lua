@@ -450,8 +450,6 @@ end
 --- @param resultSelector function|nil @A transform function to apply to each element of the intermediate sequence, or nil to do no transformation.
 --- @return Enumerable @An {@see Enumerable} whose elements are the result of invoking the one-to-many transform function collectionSelector on each element of source and then mapping each of those sequence elements and their corresponding source element to a result element.
 function Enumerable:SelectMany(collectionSelector, resultSelector)
-    resultSelector = resultSelector or noTransform;
-
     local getPrevIterator = self.getIterator;
 
     local function getIterator()
@@ -467,7 +465,11 @@ function Enumerable:SelectMany(collectionSelector, resultSelector)
                 collectionKey, valueResult = next(collection, collectionKey);
                 if (collectionKey ~= nil) then
                     index = index + 1;
-                    return index, resultSelector(valueSource, valueResult);
+                    if (resultSelector) then
+                        return index, resultSelector(valueSource, valueResult);
+                    else
+                        return index, valueResult;
+                    end
                 end
 
                 if (collectionKey == nil) then
