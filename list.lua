@@ -16,6 +16,8 @@ local ReadOnlyCollection = Linq.ReadOnlyCollection;
 --- @class List : ReadOnlyCollection
 local List = {};
 
+local ListMT = {__index = function(t, key, ...) return List[key] or Linq.Enumerable[key]; end};
+
 Mixin(List, ReadOnlyCollection);
 
 --- Initializes a new instance of the {@see List} class.
@@ -24,8 +26,7 @@ Mixin(List, ReadOnlyCollection);
 function List.New(source)
     assert(source == nil or type(source) == "table");
 
-    local list = Mixin({}, List);
-    list = setmetatable(list, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    local list = setmetatable({}, ListMT);
 
     list.Length = 0;
 

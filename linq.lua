@@ -33,7 +33,7 @@ local function noTransform(value) return value; end
 
 local Set = {
     Add = function(self, item)
-        assert(item ~= nil, "Bad argument #1 to 'Linq.HashSet:Add': 'item' cannot be a nil value.");
+        assert(item ~= nil, "Bad argument #1 to 'Add': 'item' cannot be a nil value.");
 
         if (self.Comparer) then
             for _, value in pairs(self.source) do
@@ -67,6 +67,8 @@ local Set = {
 --- @class Enumerable
 local Enumerable = {};
 
+local EnumerableMT = {__index = function(t, key, ...) return Linq.Enumerable[key]; end};
+
 -- ========================
 -- == Deferred execution ==
 -- ========================
@@ -75,10 +77,8 @@ local Enumerable = {};
 --- @param element any @The value to append to source.
 --- @return Enumerable @An {@see Enumerable} that ends with element.
 function Enumerable:Append(element)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local appended = false;
         local maxIndex = 1;
@@ -99,17 +99,15 @@ function Enumerable:Append(element)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Concatenates two sequences.
 --- @param second table|Enumerable @The sequence to concatenate to the first sequence.
 --- @return Enumerable @An {@see Enumerable} that contains the concatenated elements of the two input sequences.
 function Enumerable:Concat(second)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local finished = false;
@@ -144,17 +142,15 @@ function Enumerable:Concat(second)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Returns the elements of the specified sequence or the specified value in a singleton collection if the sequence is empty.
 --- @param defaultValue any @The value to return if the sequence is empty.
 --- @return Enumerable @An {@see Enumerable} that contains defaultValue if source is empty; otherwise, source.
 function Enumerable:DefaultIfEmpty(defaultValue)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local isEmpty = true;
         return function()
@@ -167,17 +163,15 @@ function Enumerable:DefaultIfEmpty(defaultValue)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Returns distinct elements from a sequence by using the given comparer or the default equality comparer to compare values.
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains distinct elements from the source sequence.
 function Enumerable:Distinct(comparer)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
         return function()
@@ -192,7 +186,7 @@ function Enumerable:Distinct(comparer)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Produces the set difference of two sequences.
@@ -208,10 +202,9 @@ end
 --- @return Enumerable @An {@see Enumerable} that contains the set difference of the elements of two sequences.
 function Enumerable:Except(second, comparer)
     comparer = comparer or equalityComparer;
-    local getPrevIterator = self.getIterator;
 
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local secondArray = Enumerable.IsEnumerable(second) and second:ToArray() or second;
 
         return function()
@@ -236,7 +229,7 @@ function Enumerable:Except(second, comparer)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Groups the elements of a sequence according to a specified key selector function and creates a result value from each group and its key.
@@ -273,7 +266,7 @@ function Enumerable:GroupBy(keySelector, elementSelector, resultSelector, compar
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Correlates the elements of two sequences based on key equality and groups the results.
@@ -286,10 +279,8 @@ end
 function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultSelector, keyComparer)
     keyComparer = keyComparer or equalityComparer;
 
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local innerArray = Enumerable.IsEnumerable(inner) and inner:ToArray() or inner;
 
         return function()
@@ -307,7 +298,7 @@ function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultS
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Produces the set intersection of two sequences.
@@ -316,10 +307,9 @@ end
 --- @return Enumerable @An {@see Enumerable} that contains the elements that form the set intersection of two sequences.
 function Enumerable:Intersect(second, comparer)
     comparer = comparer or equalityComparer;
-    local getPrevIterator = self.getIterator;
 
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local secondArray = Enumerable.IsEnumerable(second) and second:ToArray() or second;
 
         return function()
@@ -344,7 +334,7 @@ function Enumerable:Intersect(second, comparer)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Correlates the elements of two sequences based on matching keys.
@@ -357,10 +347,8 @@ end
 function Enumerable:Join(inner, outerKeySelector, innerKeySelector, resultSelector, comparer)
     comparer = comparer or equalityComparer;
 
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local innerArray = Enumerable.IsEnumerable(inner) and inner:ToArray() or inner;
 
         local index = 0;
@@ -383,17 +371,15 @@ function Enumerable:Join(inner, outerKeySelector, innerKeySelector, resultSelect
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Adds a value to the beginning of the sequence.
 --- @param element any @The value to prepend to source.
 --- @return Enumerable @An {@see Enumerable} that begins with element.
 function Enumerable:Prepend(element)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local index = 1;
         local prepended = false;
@@ -411,7 +397,7 @@ function Enumerable:Prepend(element)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Inverts the order of the elements in a sequence.
@@ -432,17 +418,15 @@ function Enumerable:Reverse()
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Projects each element of a sequence into a new form.
 --- @param selector function @A transform function to apply to each source element.
 --- @return Enumerable @An {@see Enumerable} whose elements are the result of invoking the transform function on each element of source.
 function Enumerable:Select(selector)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         return function()
             local key, value = getNext();
@@ -450,7 +434,7 @@ function Enumerable:Select(selector)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Projects each element of a sequence and flattens the resulting sequences into one sequence.
@@ -458,10 +442,8 @@ end
 --- @param resultSelector function|nil @A transform function to apply to each element of the intermediate sequence, or nil to do no transformation.
 --- @return Enumerable @An {@see Enumerable} whose elements are the result of invoking the one-to-many transform function collectionSelector on each element of source and then mapping each of those sequence elements and their corresponding source element to a result element.
 function Enumerable:SelectMany(collectionSelector, resultSelector)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local index = 0;
         local key, valueSource = getNext();
@@ -488,17 +470,15 @@ function Enumerable:SelectMany(collectionSelector, resultSelector)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Bypasses a specified number of elements in a sequence and then returns the remaining elements.
 --- @param count number @The number of elements to skip before returning the remaining elements.
 --- @return Enumerable @An {@see Enumerable} that contains the elements that occur after the specified index in the input sequence.
 function Enumerable:Skip(count)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local index = 1;
         return function()
@@ -514,17 +494,15 @@ function Enumerable:Skip(count)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Bypasses elements in a sequence as long as a specified condition is true and then returns the remaining elements.
 --- @param predicate number @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from the input sequence starting at the first element in the linear series that does not pass the test specified by `predicate`.
 function Enumerable:SkipWhile(predicate)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local skipping = true;
         return function()
@@ -543,17 +521,15 @@ function Enumerable:SkipWhile(predicate)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Returns a specified number of contiguous elements from the start of a sequence.
 --- @param count number @The number of elements to return.
 --- @return Enumerable @An {@see Enumerable} that contains the specified number of elements from the start of the input sequence.
 function Enumerable:Take(count)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local index = 1;
         return function()
@@ -571,17 +547,15 @@ function Enumerable:Take(count)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Returns elements from a sequence as long as a specified condition is true, and then skips the remaining elements.
 --- @param predicate number @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from the input sequence that occur before the element at which the test no longer passes.
 function Enumerable:TakeWhile(predicate)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         local taking = true;
         return function()
@@ -599,17 +573,15 @@ function Enumerable:TakeWhile(predicate)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Filters a sequence of values based on a predicate.
 --- @param predicate function @A function to test each element for a condition.
 --- @return Enumerable @An {@see Enumerable} that contains elements from the input sequence that satify the condition.
 function Enumerable:Where(predicate)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
 
         return function()
             local key, value = getNext();
@@ -623,7 +595,7 @@ function Enumerable:Where(predicate)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Produces the set union of two sequences.
@@ -632,10 +604,8 @@ end
 --- @param comparer function|nil @A comparer to compare values, or nil to use the default equality comparer.
 --- @return Enumerable @An {@see Enumerable} that contains the elements from both input sequences, excluding duplicates.
 function Enumerable:Union(second, comparer)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
@@ -673,7 +643,7 @@ function Enumerable:Union(second, comparer)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 --- Produces a sequence of tuples with elements from the two specified sequences.
@@ -682,10 +652,8 @@ end
 --- @param resultSelector function|nil @A function that specifies how to merge the elements from the two sequences, or `nil` to return the tuple.
 --- @return Enumerable @An {@see Enumerable} of tuples with elements taken from the first and second sequences, in that order, or apply the given function on the elements to produce the result.
 function Enumerable:Zip(second, resultSelector)
-    local getPrevIterator = self.getIterator;
-
     local function getIterator()
-        local getNext = getPrevIterator();
+        local getNext = self.getIterator();
         local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
         local index = 0;
@@ -700,7 +668,7 @@ function Enumerable:Zip(second, resultSelector)
         end
     end
 
-    return setmetatable({getIterator = getIterator}, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    return setmetatable({getIterator = getIterator}, EnumerableMT);
 end
 
 -- =========================
@@ -1164,6 +1132,8 @@ end
 --- @class OrderedEnumerable : Enumerable
 local OrderedEnumerable = {};
 
+local OrderedEnumerableMT = {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end};
+
 Mixin(OrderedEnumerable, Enumerable);
 
 --- Performs a subsequent ordering of the elements in a sequence in ascending order.
@@ -1186,7 +1156,7 @@ function OrderedEnumerable:ThenBy(keySelector, comparer)
 
     return setmetatable(
                {getIterator = sortIterator(enumerable, comparator), enumerable = enumerable, comparator = comparator},
-               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+               OrderedEnumerableMT
            );
 end
 
@@ -1210,7 +1180,7 @@ function OrderedEnumerable:ThenByDescending(keySelector, comparer)
 
     return setmetatable(
                {getIterator = sortIterator(enumerable, comparator), enumerable = enumerable, comparator = comparator},
-               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+               OrderedEnumerableMT
            );
 end
 
@@ -1221,14 +1191,17 @@ end
 --- @class ReadOnlyCollection : Enumerable
 local ReadOnlyCollection = {};
 
+local ReadOnlyCollectionMT = {
+    __index = function(t, key, ...) return ReadOnlyCollection[key] or Linq.Enumerable[key]; end,
+};
+
 --- Initializes a new instance of the {@see ReadOnlyCollection} class.
 --- @param source table|nil
 --- @return ReadOnlyCollection @The new instance of {@see ReadOnlyCollection}.
 function ReadOnlyCollection.New(source)
     assert(source == nil or type(source) == "table");
 
-    local collection = Mixin({}, ReadOnlyCollection);
-    collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    local collection = setmetatable({}, ReadOnlyCollectionMT);
 
     source = Enumerable.IsEnumerable(source) and source:ToTable() or source;
     collection.source = source or {};

@@ -13,6 +13,8 @@ end
 --- @class HashSet : Enumerable
 local HashSet = {};
 
+local HashSetMT = {__index = function(t, key, ...) return HashSet[key] or Linq.Enumerable[key]; end};
+
 --- Initializes a new instance of the {@see HashSet} class.
 --- @param source table|nil @The collection whose elements are copied to the new set, or `nil` to start with an empty set.
 --- @param comparer function|nil @The function to use when comparing values in the set, or `nil` to use the default equality comparer.
@@ -20,8 +22,7 @@ local HashSet = {};
 function HashSet.New(source, comparer)
     assert(source == nil or type(source) == "table");
 
-    local set = Mixin({}, HashSet);
-    set = setmetatable(set, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
+    local set = setmetatable({}, HashSetMT);
 
     set.source = {};
 

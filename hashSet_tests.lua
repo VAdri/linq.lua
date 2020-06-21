@@ -66,7 +66,7 @@ describe("HashSet:Add", function()
                 local hashSet = HashSet.New();
                 hashSet:Add(nil);
             end,
-            "Bad argument #1 to 'Linq.HashSet:Add': 'item' cannot be a nil value."
+            "Bad argument #1 to 'Add': 'item' cannot be a nil value."
         );
     end);
 end);
