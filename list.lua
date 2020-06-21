@@ -6,7 +6,7 @@ else
     Linq = require "linq";
 end
 
---- @type ReadOnlyCollection|OrderedEnumerable|Enumerable
+--- @type ReadOnlyCollection|Enumerable
 local ReadOnlyCollection = Linq.ReadOnlyCollection;
 
 -- *********************************************************************************************************************
@@ -25,7 +25,7 @@ function List.New(source)
     assert(source == nil or type(source) == "table");
 
     local list = Mixin({}, List);
-    list = setmetatable(list, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end});
+    list = setmetatable(list, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 
     list.Length = 0;
 

@@ -17,6 +17,14 @@ local next = next;
 
 local function equalityComparer(item1, item2) return item1 == item2; end
 
+local function defaultSort(item1, item2)
+    if (item1 == item2) then
+        return 0;
+    else
+        return item1 < item2 and -1 or 1;
+    end
+end
+
 local function alwaysTrue() return true; end
 
 local function defaultGrouping(key, elements) return {Key = key, Values = elements}; end
@@ -1104,40 +1112,113 @@ end
 -- ** OrderedEnumerable
 -- *********************************************************************************************************************
 
+local function sortIterator(self, comparator)
+    return function()
+        -- This is non-streaming so we need to get all the results first
+        local currentResults = self:ToArray();
+
+        -- Apply the sort
+        table.sort(currentResults, function(item1, item2) return comparator(item1, item2) < 0; end);
+
+        -- Return the enumerator
+        local count = #currentResults;
+        local key = 0;
+        return function()
+            if (key == count) then return; end
+            key = key + 1;
+            return key, currentResults[key];
+        end
+    end
+end
+
+--- Sorts the elements of a sequence in ascending order according to a key, using the given comparer or the default sort comparer.
+--- @param keySelector function @A function to extract a key from an element.
+--- @param comparer function|nil @A function to compare values, or `nil` to use the default sort comparer.
+--- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
+function Enumerable:OrderBy(keySelector, comparer)
+    comparer = comparer or defaultSort;
+
+    local function comparator(item1, item2) return comparer(keySelector(item1), keySelector(item2)); end
+
+    return setmetatable(
+               {getIterator = sortIterator(self, comparator), enumerable = self, comparator = comparator},
+               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+           );
+end
+
+--- Sorts the elements of a sequence in descending order according to a key, using the given comparer or the default sort comparer.
+--- @param keySelector function @A function to extract a key from an element.
+--- @param comparer function|nil @A function to compare values, or nil to use the default sort comparer.
+--- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
+function Enumerable:OrderByDescending(keySelector, comparer)
+    comparer = comparer or defaultSort;
+
+    local function comparator(item1, item2) return comparer(keySelector(item2), keySelector(item1)); end
+
+    return setmetatable(
+               {getIterator = sortIterator(self, comparator), enumerable = self, comparator = comparator},
+               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+           );
+end
+
 --- @class OrderedEnumerable : Enumerable
 local OrderedEnumerable = {};
 
 Mixin(OrderedEnumerable, Enumerable);
 
---- Sorts the elements of a sequence in ascending order according to a key.
---- @param keySelector function @A function to extract a key from an element.
---- @param comparer function|nil @A function to compare values, or nil to use the default equality comparer.
---- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
-function OrderedEnumerable:OrderBy(keySelector, comparer) comparer = comparer or equalityComparer; end
-
---- Sorts the elements of a sequence in descending order according to a key.
---- @param keySelector function @A function to extract a key from an element.
---- @param comparer function|nil @A function to compare values, or nil to use the default equality comparer.
---- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
-function OrderedEnumerable:OrderByDescending(keySelector, comparer) comparer = comparer or equalityComparer; end
-
 --- Performs a subsequent ordering of the elements in a sequence in ascending order.
 --- @param keySelector function @A function to extract a key from an element.
 --- @param comparer function|nil @A function to compare values, or nil to use the default equality comparer.
 --- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
-function OrderedEnumerable:ThenBy(keySelector, comparer) comparer = comparer or equalityComparer; end
+function OrderedEnumerable:ThenBy(keySelector, comparer)
+    comparer = comparer or defaultSort;
+
+    local function comparator(item1, item2)
+        local prevCompare = self.comparator(item1, item2);
+        if (prevCompare == 0) then
+            return comparer(keySelector(item1), keySelector(item2));
+        else
+            return prevCompare;
+        end
+    end
+
+    local enumerable = self.enumerable;
+
+    return setmetatable(
+               {getIterator = sortIterator(enumerable, comparator), enumerable = enumerable, comparator = comparator},
+               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+           );
+end
 
 --- Performs a subsequent ordering of the elements in a sequence in descending order.
 --- @param keySelector function @A function to extract a key from an element.
 --- @param comparer function|nil @A function to compare values, or nil to use the default equality comparer.
 --- @return OrderedEnumerable @An {@see OrderedEnumerable} whose elements are sorted according to a key.
-function OrderedEnumerable:ThenByDescending(keySelector, comparer) comparer = comparer or equalityComparer; end
+function OrderedEnumerable:ThenByDescending(keySelector, comparer)
+    comparer = comparer or defaultSort;
+
+    local function comparator(item1, item2)
+        local prevCompare = self.comparator(item1, item2);
+        if (prevCompare == 0) then
+            return comparer(keySelector(item2), keySelector(item1));
+        else
+            return prevCompare;
+        end
+    end
+
+    local enumerable = self.enumerable;
+
+    return setmetatable(
+               {getIterator = sortIterator(enumerable, comparator), enumerable = enumerable, comparator = comparator},
+               {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end}
+           );
+end
 
 -- *********************************************************************************************************************
 -- ** ReadOnlyCollection
 -- *********************************************************************************************************************
 
---- @class ReadOnlyCollection : OrderedEnumerable
+--- @class ReadOnlyCollection : Enumerable
 local ReadOnlyCollection = {};
 
 --- Initializes a new instance of the {@see ReadOnlyCollection} class.
@@ -1147,7 +1228,7 @@ function ReadOnlyCollection.New(source)
     assert(source == nil or type(source) == "table");
 
     local collection = Mixin({}, ReadOnlyCollection);
-    collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.OrderedEnumerable[key]; end});
+    collection = setmetatable(collection, {__index = function(t, key, ...) return Linq.Enumerable[key]; end});
 
     source = Enumerable.IsEnumerable(source) and source:ToTable() or source;
     collection.source = source or {};

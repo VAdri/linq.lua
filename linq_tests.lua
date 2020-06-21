@@ -2,7 +2,7 @@ local Linq = require "linq";
 require "list";
 require "hashSet";
 
---- @type List|OrderedEnumerable|Enumerable
+--- @type List|Enumerable
 local List = Linq.List;
 
 --- @type Enumerable
@@ -1572,3 +1572,226 @@ end);
 -- =====================================================================================================================
 -- == OrderedEnumerable Unit Tests
 -- =====================================================================================================================
+
+describe("Enumerable:OrderBy", function()
+    it("sorts the elements of a sequence in ascending order", function()
+        local pets = {
+            { Name = "Barley", Age = 8 },
+            { Name = "Boots", Age = 4 },
+            { Name = "Whiskers", Age = 1 }
+        };
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderBy(function(pet) return pet.Age; end)
+            :ToArray();
+
+        assert.same({{ Name = "Whiskers", Age = 1 }, { Name = "Boots", Age = 4 }, { Name = "Barley", Age = 8 }}, orderedPets);
+    end);
+
+    it("sorts the elements of a sequence in ascending order using the given comparer", function()
+        local source = { "Prakash", "Alpha", "dan", "Prakash" };
+
+        local result = Enumerable.From(source)
+            :OrderBy(
+                function(string) return string; end,
+                function(s1, s2)
+                    local len1, len2 = s1:len(), s2:len();
+                    if (len1 == len2) then
+                        return 0;
+                    else
+                        return len1 < len2 and -1 or 1;
+                    end
+                end
+            )
+            :ToArray();
+
+        assert.same({ "dan", "Alpha", "Prakash", "Prakash" }, result);
+    end);
+
+    it("returns an empty result when the given source is empty", function()
+        local pets = {};
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderBy(function(pet) return pet.Age; end)
+            :ToArray();
+
+        assert.same({}, orderedPets);
+    end);
+end);
+
+describe("Enumerable:OrderByDescending", function()
+    it("sorts the elements of a sequence in descending order", function()
+        local pets = {
+            { Name = "Barley", Age = 8 },
+            { Name = "Boots", Age = 4 },
+            { Name = "Whiskers", Age = 1 }
+        };
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderByDescending(function(pet) return pet.Age; end)
+            :ToArray();
+
+        assert.same({{ Name = "Barley", Age = 8 }, { Name = "Boots", Age = 4 }, { Name = "Whiskers", Age = 1 }}, orderedPets);
+    end);
+
+    it("sorts the elements of a sequence in descending order using the given comparer", function()
+        local decimals = { 6.2, 8.3, 0.5, 1.3, 6.3, 9.7 };
+
+        local results = Enumerable.From(decimals)
+            :OrderByDescending(
+                function(num) return num; end,
+                function(num1, num2)
+                    local int1 = math.floor(num1);
+                    local int2 = math.floor(num2);
+
+                    -- Workaround to avoid floating point comparison errors
+                    -- (see https://codea.io/talk/discussion/8728/0-3-does-not-equal-0-3-codea-bug-lua-bug-ambush-bug)
+                    local frac1 = math.floor((num1 - int1 + 0.0001) * 10);
+                    local frac2 = math.floor((num2 - int2 + 0.0001) * 10);
+
+                    if (frac1 == frac2) then
+                        if (int1 == int2) then
+                            return 0;
+                        else
+                            return int1 < int2 and -1 or 1;
+                        end
+                    else
+                        if (frac1 == frac2) then
+                            return 0;
+                        else
+                            return frac1 < frac2 and -1 or 1;
+                        end
+                    end
+                end
+            )
+            :ToArray();
+
+        assert.same({ 9.7, 0.5, 8.3, 6.3, 1.3, 6.2}, results);
+    end);
+
+    it("returns an empty result when the given source is empty", function()
+        local pets = {};
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderByDescending(function(pet) return pet.Age; end)
+            :ToArray();
+
+        assert.same({}, orderedPets);
+    end);
+end);
+
+describe("Enumerable:ThenBy", function()
+    it("performs a subsequent ordering of the elements in a sequence in ascending order", function()
+        local fruits = { "grape", "passionfruit", "banana", "mango", "orange", "raspberry", "apple", "blueberry" };
+
+        local results = Enumerable.From(fruits)
+            :OrderBy(function(fruit) return fruit:len(); end)
+            :ThenBy(function(fruit) return fruit; end)
+            :ToArray();
+
+        assert.same({"apple", "grape", "mango", "banana", "orange", "blueberry", "raspberry", "passionfruit"}, results);
+    end);
+
+    it("performs a subsequent ordering of the elements in a sequence in ascending order using the given comparer", function()
+        local pets = {
+            { Name = "Barley", Age = 8 },
+            { Name = "Boots", Age = 4 },
+            { Name = "Alfred", Age = 4 },
+            { Name = "Whiskers", Age = 1 }
+        };
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderByDescending(function(pet) return pet.Age; end)
+            :ThenBy(
+                function(pet) return pet.Name; end,
+                function(name1, name2)
+                    local l1, l2 = name1:len(), name2:len();
+                    if (l1 == l2) then
+                        return 0;
+                    else
+                        return l1 < l2 and -1 or 1;
+                    end
+                end
+            )
+            :ToArray();
+
+        assert.same(
+            {
+                { Name = "Barley", Age = 8 },
+                { Name = "Boots", Age = 4 },
+                { Name = "Alfred", Age = 4 },
+                { Name = "Whiskers", Age = 1 }
+            },
+            orderedPets
+        );
+    end);
+
+    it("returns an empty result when the given source is empty", function()
+        local fruits = {};
+
+        local results = Enumerable.From(fruits)
+            :OrderBy(function(fruit) return fruit:len(); end)
+            :ThenBy(function(fruit) return fruit; end)
+            :ToArray();
+
+        assert.same({}, results);
+    end);
+end);
+
+describe("Enumerable:ThenByDescending", function()
+    it("performs a subsequent ordering of the elements in a sequence in descending order", function()
+        local fruits = { "grape", "passionfruit", "banana", "mango", "orange", "raspberry", "apple", "blueberry" };
+
+        local results = Enumerable.From(fruits)
+            :OrderBy(function(fruit) return fruit:len(); end)
+            :ThenByDescending(function(fruit) return fruit; end)
+            :ToArray();
+
+        assert.same({"mango", "grape", "apple", "orange", "banana", "raspberry", "blueberry", "passionfruit"}, results);
+    end);
+
+    it("performs a subsequent ordering of the elements in a sequence in descending order using the given comparer", function()
+        local pets = {
+            { Name = "Barley", Age = 8 },
+            { Name = "Boots", Age = 4 },
+            { Name = "Alfred", Age = 4 },
+            { Name = "Whiskers", Age = 1 }
+        };
+
+        local orderedPets = Enumerable.From(pets)
+            :OrderByDescending(function(pet) return pet.Age; end)
+            :ThenByDescending(
+                function(pet) return pet.Name; end,
+                function(name1, name2)
+                    local l1, l2 = name1:len(), name2:len();
+                    if (l1 == l2) then
+                        return 0;
+                    else
+                        return l1 < l2 and -1 or 1;
+                    end
+                end
+            )
+            :ToArray();
+
+        assert.same(
+            {
+                { Name = "Barley", Age = 8 },
+                { Name = "Alfred", Age = 4 },
+                { Name = "Boots", Age = 4 },
+                { Name = "Whiskers", Age = 1 }
+            },
+            orderedPets
+        );
+    end);
+
+    it("returns an empty result when the given source is empty", function()
+        local fruits = {};
+
+        local results = Enumerable.From(fruits)
+            :OrderBy(function(fruit) return fruit:len(); end)
+            :ThenByDescending(function(fruit) return fruit; end)
+            :ToArray();
+
+        assert.same({}, results);
+    end);
+end);

@@ -83,7 +83,7 @@ local HashSet = Linq.HashSet;
 Sometimes EmmyLua doesn't detect inheritance, in which case you need to declare it yourself:
 
 ```lua
---- @type List|ReadOnlyCollection|OrderedEnumerable|Enumerable
+--- @type List|ReadOnlyCollection|Enumerable
 local List = Linq.List;
 ```
 
@@ -218,6 +218,8 @@ Enumerable.From(t):Sum(); -- Use this instead
 | LastOrDefault       |     X     |          |        |
 | Max                 |     X     |          |        |
 | Min                 |     X     |          |        |
+| OrderBy             |           |    X     |        |
+| OrderByDescending   |           |    X     |        |
 | Range               |           |          |   X    |
 | Repeat              |           |          |   X    |
 | Reverse             |           |    X     |        |
@@ -241,12 +243,10 @@ Enumerable.From(t):Sum(); -- Use this instead
 
 ### OrderedEnumerable
 
-| Name                     | Immediate | Deferred | Static |
-| ------------------------ | :-------: | :------: | :----: |
-| <s>OrderBy</s>           |           |          |        |
-| <s>OrderByDescending</s> |           |          |        |
-| <s>ThenBy</s>            |           |          |        |
-| <s>ThenByDescending</s>  |           |          |        |
+| Name             | Immediate | Deferred | Static |
+| ---------------- | :-------: | :------: | :----: |
+| ThenBy           |           |    X     |        |
+| ThenByDescending |           |    X     |        |
 
 ### List
 
