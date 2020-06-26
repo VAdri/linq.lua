@@ -9,6 +9,9 @@ end
 --- @type ReadOnlyCollection|Enumerable
 local ReadOnlyCollection = Linq.ReadOnlyCollection;
 
+local assert, type, pairs, setmetatable = assert, type, pairs, setmetatable;
+local wipe = wipe;
+
 -- *********************************************************************************************************************
 -- ** List
 -- *********************************************************************************************************************
@@ -30,10 +33,14 @@ function List.New(source)
 
     list.Length = 0;
 
-    -- Shallow copy because we don't want to modify the source sequence
-    source = Linq.Enumerable.IsEnumerable(source) and source:ToTable() or source;
     list.source = {};
-    for _, v in pairs(source or {}) do list:Add(v); end
+
+    -- Shallow copy because we don't want to modify the source sequence
+    if (Linq.Enumerable.IsEnumerable(source)) then
+        for _, v in source:GetEnumerator() do list:Add(v); end
+    else
+        for _, v in pairs(source or {}) do list:Add(v); end
+    end
 
     list:_ArrayIterator();
 
@@ -43,10 +50,10 @@ end
 --- Adds an object to the end of the {@see List}.
 --- @param item any @The object to be added to the end of the {@see List}.
 function List:Add(item)
-    if (item ~= nil) then
-        self.Length = self.Length + 1;
-        table.insert(self.source, item);
-    end
+    self.Length = self.Length + 1;
+
+    -- Not using table.insert here because item can be nil
+    self.source[self.Length] = item;
 end
 
 --- Adds the elements of the specified collection to the end of the {@see List}.
@@ -64,8 +71,11 @@ end
 function List:RemoveAt(index)
     assert(index >= 1, "index is less than 1.");
     assert(index <= self.Length, "index is equal to or greater than Length.");
-    table.remove(self.source, index);
-    self.Length = #self.source;
+
+    -- Remove the element at the current index by moving each element in the index below
+    -- (we cannot use table.remove because the table can contain nil values)
+    for i = index, self.Length do self.source[i] = self.source[i + 1]; end
+    self.Length = self.Length - 1;
 end
 
 -- *********************************************************************************************************************

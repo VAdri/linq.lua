@@ -6,14 +6,22 @@ else
     Linq = require "linq";
 end
 
+--- @type Set|Enumerable
+local Set = Linq.Set;
+
+local assert, type, pairs, setmetatable = assert, type, pairs, setmetatable;
+local tinsert = table.insert;
+
 -- *********************************************************************************************************************
 -- ** HashSet
 -- *********************************************************************************************************************
 
---- @class HashSet : Enumerable
+--- @class HashSet : Set
 local HashSet = {};
 
 local HashSetMT = {__index = function(t, key, ...) return HashSet[key] or Linq.Enumerable[key]; end};
+
+Mixin(HashSet, Set);
 
 --- Initializes a new instance of the {@see HashSet} class.
 --- @param source table|nil @The collection whose elements are copied to the new set, or `nil` to start with an empty set.
@@ -29,72 +37,15 @@ function HashSet.New(source, comparer)
     set.Comparer = comparer;
     set.Length = 0;
 
-    source = Linq.Enumerable.IsEnumerable(source) and source:ToTable() or source;
-    for _, v in pairs(source or {}) do set:Add(v); end
+    if (Linq.Enumerable.IsEnumerable(source)) then
+        for _, v in source:GetEnumerator() do set:Add(v); end
+    else
+        for _, v in pairs(source or {}) do set:Add(v); end
+    end
 
     set:_SetIterator();
 
     return set;
-end
-
---- Iterates over all the elements in a set.
-function HashSet:_SetIterator()
-    local function getIterator()
-        local index = 0;
-        local key, value;
-        if (self.comparer) then
-            -- With a comparer we are not using a real set (slower)
-            return function()
-                key, value = next(self.source, key);
-                if (not key) then return; end
-                index = index + 1;
-                return index, value;
-            end
-        else
-            -- Without comparer we are using a real set (faster)
-            return function()
-                key = next(self.source, key);
-                if (not key) then return; end
-                index = index + 1;
-                return index, key;
-            end
-        end
-    end
-
-    self.getIterator = getIterator;
-end
-
---- For private use only.
-function HashSet:_FindItemKey(item)
-    if (self.Comparer) then
-        for key, value in pairs(self.source) do if (self.Comparer(value, item)) then return key; end end
-    else
-        if (self.source[item]) then return item; end
-    end
-
-    return nil;
-end
-
---- Adds the specified element to a set.
---- @param item any @The element to add to the set.
---- @return boolean @`true` if the element is added to the HashSet object; `false` if the element is already present.
-HashSet.Add = Linq._Set.Add;
-
---- Removes all elements from a {@see HashSet} object.
-function HashSet:Clear()
-    wipe(self.source);
-    self.Length = 0;
-end
-
---- Determines whether a {@see HashSet} object contains the specified element.
---- @param item any @The element to locate in the {@see HashSet} object.
---- @return boolean @`true` if the {@see HashSet} object contains the specified element; otherwise, `false`.
-function HashSet:Contains(item)
-    if (self.Length == 0) then
-        return false;
-    else
-        return self:_FindItemKey(item) ~= nil;
-    end
 end
 
 --- Removes all elements in the specified collection from the current {@see HashSet} object.
@@ -139,36 +90,6 @@ function HashSet:IntersectWith(other)
     end
 end
 
---- Removes the specified element from a {@see HashSet} object.
---- @param item any @The element to remove.
---- @return boolean @`true` if the element is successfully found and removed; otherwise, `false`. This method returns `false` if item is not found in the HashSet object.
-function HashSet:Remove(item)
-    assert(item ~= nil, "Bad argument #1 to 'Linq.HashSet:Remove': 'item' cannot be a nil value.");
-
-    if (self.Comparer) then
-        for key, value in pairs(self.source) do
-            if (self.Comparer(value, item)) then
-                -- The item exists in the set
-                table.remove(self.source, key);
-                self.Length = self.Length - 1;
-                return true;
-            end
-        end
-        -- This item does not exist in the set
-        return false;
-    else
-        if (self.source[item]) then
-            -- The item exists in the set
-            self.source[item] = nil;
-            self.Length = self.Length - 1;
-            return true;
-        else
-            -- This item does not exist in the set
-            return false;
-        end
-    end
-end
-
 -- --- TODO: Code+Test+Doc
 -- function HashSet:RemoveWhere(predicate) end
 
@@ -187,9 +108,9 @@ function HashSet:SymmetricExceptWith(other)
         local itemsToRemove = {};
         for _, value in pairs(other) do
             if (self:Add(value)) then
-                table.insert(addedFromOther, value);
+                tinsert(addedFromOther, value);
             else
-                table.insert(itemsToRemove, value);
+                tinsert(itemsToRemove, value);
             end
         end
         for _, value in pairs(Linq.Enumerable.From(itemsToRemove):Except(addedFromOther):ToArray()) do
@@ -199,7 +120,10 @@ function HashSet:SymmetricExceptWith(other)
     end
 end
 
---- TODO: Test+Doc
+--- Searches the set for a given value and returns the equal value it finds, if any.
+--- @param equalValue any @The value to search for.
+--- @return boolean @A value indicating whether the search was successful.
+--- @return any @The value from the set that the search found, or `nil` when the search yielded no match.
 function HashSet:TryGetValue(equalValue)
     if (self.Comparer) then
         for _, value in pairs(self.source) do
@@ -209,14 +133,14 @@ function HashSet:TryGetValue(equalValue)
             end
         end
         -- This item does not exist in the set
-        return false, equalValue;
+        return false, nil;
     else
         if (self.source[equalValue]) then
             -- The item exists in the set
             return true, equalValue;
         else
             -- This item does not exist in the set
-            return false, equalValue;
+            return false, nil;
         end
     end
 end

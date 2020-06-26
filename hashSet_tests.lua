@@ -4,6 +4,8 @@ require "hashSet";
 --- @type HashSet|Enumerable
 local HashSet = Linq.HashSet;
 
+local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
+
 describe("HashSet:Add", function()
     it("adds an item if it doesn't already exist", function()
         local hashSet = HashSet.New({"a", 12, false, {}});
@@ -25,7 +27,6 @@ describe("HashSet:Add", function()
             { Name = "Apple", Code = 9 },
             { Name = "lemon", Code = 12 }
         };
-        local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         local hashSet = HashSet.New(store, isSameProduct);
         assert.equal(3, hashSet.Length);
         assert.is_true(hashSet:Add({ Name = "lemon", Code = 13 }));
@@ -53,7 +54,6 @@ describe("HashSet:Add", function()
             { Name = "Apple", Code = 9 },
             { Name = "lemon", Code = 12 }
         };
-        local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         local hashSet = HashSet.New(store, isSameProduct);
         assert.equal(3, hashSet.Length);
         assert.is_false(hashSet:Add({ Name = "peach", Code = 12 }));
@@ -99,7 +99,6 @@ describe("HashSet:Contains", function()
             { Name = "Apple", Code = 9 },
             { Name = "lemon", Code = 12 }
         };
-        local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         local hashSet = HashSet.New(store, isSameProduct);
         assert.is_true(hashSet:Contains(store[1]));
         assert.is_true(hashSet:Contains({ Name = "peach", Code = 12 }));
@@ -258,10 +257,9 @@ describe("HashSet:Remove", function()
             { Name = "Apple", Code = 9 },
             { Name = "lemon", Code = 12 }
         };
-        local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         local hashSet = HashSet.New(store, isSameProduct);
         assert.equal(3, hashSet.Length);
-        assert.is_true(hashSet:Remove({ Name = "lemon", Code = 12 }));
+        assert.is_true(hashSet:Remove({ Name = "ananas", Code = 12 }));
         assert.equal(2, hashSet.Length);
     end);
 
@@ -280,7 +278,6 @@ describe("HashSet:Remove", function()
             { Name = "Apple", Code = 9 },
             { Name = "lemon", Code = 12 }
         };
-        local isSameProduct = function(product1, product2) return product1.Code == product2.Code; end;
         local hashSet = HashSet.New(store, isSameProduct);
         assert.equal(3, hashSet.Length);
         assert.is_false(hashSet:Remove({ Name = "lemon", Code = 13 }));
@@ -293,7 +290,7 @@ describe("HashSet:Remove", function()
                 local hashSet = HashSet.New();
                 hashSet:Remove(nil);
             end,
-            "Bad argument #1 to 'Linq.HashSet:Remove': 'item' cannot be a nil value."
+            "Bad argument #1 to 'Remove': 'item' cannot be a nil value."
         );
     end);
 end);
@@ -342,6 +339,77 @@ describe("HashSet:SymmetricExceptWith", function()
         assert.equal(7, hashSet.Length);
         hashSet:SymmetricExceptWith(hashSet);
         assert.equal(0, hashSet.Length);
+    end);
+end);
+
+describe("HashSet:TryGetValue", function()
+    it("returns true and the value in the set", function()
+        local hashSet = HashSet.New({1, 2, 3, 3, a = 4, "b", false});
+        local obj = {};
+        hashSet:Add(obj);
+        local hasValue, value = hashSet:TryGetValue(1);
+        assert.is_true(hasValue);
+        assert.equal(1, value);
+        hasValue, value = hashSet:TryGetValue(4);
+        assert.is_true(hasValue);
+        assert.equal(4, value);
+        hasValue, value = hashSet:TryGetValue(obj);
+        assert.is_true(hasValue);
+        assert.equal(obj, value);
+        hasValue, value = hashSet:TryGetValue("b");
+        assert.is_true(hasValue);
+        assert.equal("b", value);
+        hasValue, value = hashSet:TryGetValue(false);
+        assert.is_true(hasValue);
+        assert.equal(false, value);
+    end);
+
+    it("returns true and the value in the set according to the comparer", function()
+        local store = {
+            { Name = "apple", Code = 9 },
+            { Name = "orange", Code = 4 },
+            { Name = "Apple", Code = 9 },
+            { Name = "lemon", Code = 12 }
+        };
+        local hashSet = HashSet.New(store, isSameProduct);
+        hashSet:Add("b", nil);
+        local hasValue, value = hashSet:TryGetValue({ Name = "potato", Code = 9 });
+        assert.is_true(hasValue);
+        assert.equal(store[1], value);
+        hasValue, value = hashSet:TryGetValue(store[2]);
+        assert.is_true(hasValue);
+        assert.equal(store[2], value);
+    end);
+
+    it("returns false and nil if the given key is not in the set", function()
+        local hashSet = HashSet.New({1, 2, 3, 3, a = 4, "b", false});
+        local obj = {};
+        hashSet:Add(obj);
+        local hasValue, value = hashSet:TryGetValue(0);
+        assert.is_false(hasValue);
+        assert.is_nil(value);
+        hasValue, value = hashSet:TryGetValue("a");
+        assert.is_false(hasValue);
+        assert.is_nil(value);
+        hasValue, value = hashSet:TryGetValue(true);
+        assert.is_false(hasValue);
+        assert.is_nil(value);
+        hasValue, value = hashSet:TryGetValue({});
+        assert.is_false(hasValue);
+        assert.is_nil(value);
+    end);
+
+    it("returns false and nil if the given key is not in the set according to the comparer", function()
+        local hashSet = HashSet.New({1, 2, 3, 3, "a"}, function() return false; end);
+        local hasValue, value = hashSet:TryGetValue(1);
+        assert.is_false(hasValue);
+        assert.equal(nil, value);
+        hasValue, value = hashSet:TryGetValue(3);
+        assert.is_false(hasValue);
+        assert.equal(nil, value);
+        hasValue, value = hashSet:TryGetValue("a");
+        assert.is_false(hasValue);
+        assert.equal(nil, value);
     end);
 end);
 

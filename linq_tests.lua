@@ -1,12 +1,16 @@
 local Linq = require "linq";
-require "list";
+require "dictionary";
 require "hashSet";
+require "list";
 
 --- @type List|Enumerable
 local List = Linq.List;
 
 --- @type Enumerable
 local Enumerable = Linq.Enumerable;
+
+-- Helpers
+local sameTypeComparer = function(item1, item2) return type(item1) == type(item2); end;
 
 -- =====================================================================================================================
 -- == Integration Tests
@@ -241,7 +245,7 @@ describe("Saving a query", function()
     end);
 
     it("reuse the enumerable with its new state", function()
-        local first = {1, 2, 3, 4, 5};
+        local first = List.New({1, 2, 3, 4, 5});
         local second = List.New({6, 7, 8});
         local third = List.New({10, 11, 12});
         local except = List.New({3});
@@ -1389,7 +1393,6 @@ describe("Enumerable:ToHashSet", function()
     it("adds only values in the set that are not equal according to the given comparer", function()
         local empty = {};
         local input = {1, 2, 3, "a", "b", "c", empty, {}, {}, true, false};
-        local sameTypeComparer = function(item1, item2) return type(item1) == type(item2); end;
         local hashSet = Enumerable.From(input):ToHashSet(sameTypeComparer);
         assert.equal(4, hashSet.Length);
     end);
@@ -1404,33 +1407,98 @@ describe("Enumerable:ToList", function()
     end);
 end);
 
--- describe("Enumerable:ToDictionary", function()
---     it("", function()
---         local packages = {
---             { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
---             { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
---             { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
---             { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
---         };
+describe("Enumerable:ToDictionary", function()
+    it("creates a dictionary where each element is associated to the result from the keySelector", function()
+        local packages = {
+            { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+            { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
+            { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
+            { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
+        };
 
---         local dictionary = Enumerable.From(packages):ToDictionary(function(item) return item.TrackingNumber; end);
---     end);
+        local dic = Enumerable.From(packages):ToDictionary(function(item) return item.TrackingNumber; end);
 
---     it("raises an error when the same key is added twice", function()
---         local packages = {
---             { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
---             { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
---             { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
---             { Company = "Wingtip Toys2", Weight = 6.0, TrackingNumber = 299456122 },
---             { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
---         };
+        assert.equal(4, dic.Length);
+        assert.same(
+            {
+                [89453312] = { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+                [89112755] = { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
+                [299456122] = { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
+                [4665518773] = { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 },
+            },
+            dic:ToTable()
+        );
+    end);
 
---         assert.has_error(
---             function() Enumerable.From(packages):ToDictionary(function(item) return item.TrackingNumber; end); end,
---             "An item with the same key has already been added."
---         );
---     end);
--- end);
+    it("creates a dictionary where each element is associated to the result from the keySelector with the value resulting from elementSelector", function()
+        local packages = {
+            { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+            { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
+            { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
+            { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
+        };
+
+        local dic = Enumerable.From(packages)
+            :ToDictionary(
+                function(item) return item.TrackingNumber; end,
+                function(item) return item.Company; end
+            );
+
+        assert.equal(4, dic.Length);
+        assert.same(
+            {
+                [89453312] = "Coho Vineyard",
+                [89112755] = "Lucerne Publishing",
+                [299456122] = "Wingtip Toys",
+                [4665518773] = "Adventure Works",
+            },
+            dic:ToTable()
+        );
+    end);
+
+    it("raises an error when the same key is added twice", function()
+        local packages = {
+            { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+            { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
+            { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
+            { Company = "Wingtip Toys2", Weight = 6.0, TrackingNumber = 299456122 },
+            { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
+        };
+
+        assert.has_error(
+            function() Enumerable.From(packages):ToDictionary(function(item) return item.TrackingNumber; end); end,
+            "An element with the same key already exists in the dictionary."
+        );
+    end);
+
+    it("raises an error when the same key is added twice according to the comparer", function()
+        local packages = {
+            { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+            { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = "89112755" },
+            { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = false },
+            { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
+        };
+
+        assert.has_error(
+            function() Enumerable.From(packages):ToDictionary(function(item) return item.TrackingNumber; end, nil, sameTypeComparer); end,
+            "An element with the same key already exists in the dictionary."
+        );
+    end);
+
+    it("raises an error when the key selector produces a nil key", function()
+        local packages = {
+            { Company = "Coho Vineyard", Weight = 25.2, TrackingNumber = 89453312 },
+            { Company = "Lucerne Publishing", Weight = 18.7, TrackingNumber = 89112755 },
+            { Company = "Wingtip Toys", Weight = 6.0, TrackingNumber = 299456122 },
+            { Company = "Adventure Works", Weight = 33.8, TrackingNumber = 4665518773 }
+        };
+
+        assert.has_error(
+            function() Enumerable.From(packages):ToDictionary(function() return nil; end); end,
+            "Bad argument #1 to 'Add': 'key' cannot be a nil value."
+        );
+    end);
+end);
 
 describe("Enumerable:ToTable", function()
     it("keeps the same keys from the input table", function()

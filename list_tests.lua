@@ -21,11 +21,15 @@ describe("List:Add", function()
         assert.equal(14, list.Length);
     end);
 
-    it("doesn't add nil values", function()
+    it("add nil values", function()
         local list = List.New({"a", 12, false, nil, {}});
         assert.equal(4, list.Length);
         list:Add(nil);
-        assert.equal(4, list.Length);
+        assert.equal(5, list.Length);
+        list:Add("b");
+        assert.equal(6, list.Length);
+        assert.same({"a", 12, false, {}, "b"}, list:ToArray());
+        assert.same({"a", 12, false, {}, [6] = "b"}, list:ToTable());
     end);
 end);
 
@@ -70,6 +74,7 @@ describe("List:Clear", function()
         assert.is_false(list:Contains("a"));
         assert.is_false(list:Contains(1));
         assert.equal(0, list.Length);
+        assert.same({}, list:ToArray());
     end);
 end);
 

@@ -9,7 +9,8 @@ else
 end
 
 local wrap, yield = coroutine.wrap, coroutine.yield;
-local next = next;
+local assert, type, pairs, next, setmetatable = assert, type, pairs, next, setmetatable;
+local tinsert, tremove, tsort, wipe = table.insert, table.remove, table.sort, wipe;
 
 -- *********************************************************************************************************************
 -- ** Helpers
@@ -30,35 +31,6 @@ local function alwaysTrue() return true; end
 local function defaultGrouping(key, elements) return {Key = key, Values = elements}; end
 
 local function noTransform(value) return value; end
-
-local Set = {
-    Add = function(self, item)
-        assert(item ~= nil, "Bad argument #1 to 'Add': 'item' cannot be a nil value.");
-
-        if (self.Comparer) then
-            for _, value in pairs(self.source) do
-                if (self.Comparer(value, item)) then
-                    -- The item already exists in the set
-                    return false;
-                end
-            end
-            -- This item does not exist in the set
-            table.insert(self.source, item);
-            self.Length = self.Length + 1;
-            return true;
-        else
-            if (self.source[item]) then
-                -- The item already exists in the set
-                return false;
-            else
-                -- This item does not exist in the set
-                self.source[item] = true;
-                self.Length = self.Length + 1;
-                return true;
-            end
-        end
-    end,
-};
 
 -- *********************************************************************************************************************
 -- ** Enumerable
@@ -173,7 +145,7 @@ function Enumerable:Distinct(comparer)
     local function getIterator()
         local getNext = self.getIterator();
 
-        local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
+        local set = Linq.Set.New({}, comparer);
         return function()
             local key, value = getNext();
             while (key ~= nil) do
@@ -256,7 +228,7 @@ function Enumerable:GroupBy(keySelector, elementSelector, resultSelector, compar
             end
 
             groups[key] = groups[key] or {};
-            table.insert(groups[key], element);
+            tinsert(groups[key], element);
         end
 
         local key, value = nil, nil;
@@ -290,7 +262,7 @@ function Enumerable:GroupJoin(inner, outerKeySelector, innerKeySelector, resultS
             local join = {};
             for _, innerValue in pairs(innerArray) do
                 if (keyComparer(outerKeySelector(outerValue), innerKeySelector(innerValue))) then
-                    table.insert(join, innerValue);
+                    tinsert(join, innerValue);
                 end
             end
 
@@ -608,7 +580,7 @@ function Enumerable:Union(second, comparer)
         local getNext = self.getIterator();
         local secondNext = Enumerable.IsEnumerable(second) and second:GetEnumerator() or next;
 
-        local set = Mixin({Comparer = comparer, Length = 0, source = {}}, Set);
+        local set = Linq.Set.New({}, comparer);
         local appending = false;
         local index = 0;
         local keySecond;
@@ -979,14 +951,25 @@ end
 --- @return table @An array that contains the elements from the input sequence.
 function Enumerable:ToArray()
     local result = {};
-    for _, item in self:GetEnumerator() do table.insert(result, item); end
+    for _, item in self:GetEnumerator() do tinsert(result, item); end
     return result;
 end
 
--- --- Creates a dictionary.
--- --- @return table @A dictionary that contains values selected from the input sequence.
--- function Enumerable:ToDictionary(keySelector, elementSelector, comparer)
--- end
+--- Creates a {@see Dictionary} according to a specified key selector function, a comparer, and an element selector function..
+--- @param keySelector function @A function to extract a key from each element.
+--- @param elementSelector function|nil @A transform function to produce a result element value from each element, or `nil` to use the element itself.
+--- @param comparer function|nil @A function to compare keys, or `nil` to use the default equality comparer.
+--- @return Dictionary @A {@see Dictionary} that contains values selected from the input sequence.
+function Enumerable:ToDictionary(keySelector, elementSelector, comparer)
+    assert(Linq.Dictionary, "'Linq.Dictionary' has not been imported.");
+    local dic = Linq.Dictionary.New(nil, comparer);
+    for k, v in self:GetEnumerator() do
+        local key = keySelector(v, k);
+        local value = elementSelector and elementSelector(v, k) or v;
+        dic:Add(key, value);
+    end
+    return dic;
+end
 
 --- Creates a {@see HashSet} from an {@see Enumerable}.
 --- @param comparer function|nil @The function to use when comparing values in the set, or `nil` to use the default equality comparer.
@@ -1043,7 +1026,7 @@ end
 function Enumerable.Range(start, count)
     assert(count >= 0, "count is less than 0.");
     local t = {};
-    for i = start, start + count - 1 do table.insert(t, i); end
+    for i = start, start + count - 1 do tinsert(t, i); end
     return Linq.ReadOnlyCollection.New(t);
 end
 
@@ -1054,7 +1037,7 @@ end
 function Enumerable.Repeat(element, count)
     assert(count >= 0, "count is less than 0.");
     local t = {};
-    for _ = 1, count do table.insert(t, element); end
+    for _ = 1, count do tinsert(t, element); end
     return Linq.ReadOnlyCollection.New(t);
 end
 
@@ -1086,7 +1069,7 @@ local function sortIterator(self, comparator)
         local currentResults = self:ToArray();
 
         -- Apply the sort
-        table.sort(currentResults, function(item1, item2) return comparator(item1, item2) < 0; end);
+        tsort(currentResults, function(item1, item2) return comparator(item1, item2) < 0; end);
 
         -- Return the enumerator
         local count = #currentResults;
@@ -1213,15 +1196,156 @@ end
 
 --- Iterates over all the elements in an array.
 function ReadOnlyCollection:_ArrayIterator()
-    local function getIterator()
+    self.getIterator = function()
         local key, value;
         return function()
             key, value = next(self.source, key);
             return key, value;
         end
     end
+end
 
-    self.getIterator = getIterator;
+-- *********************************************************************************************************************
+-- ** Set
+-- *********************************************************************************************************************
+
+--- @class Set : Enumerable
+local Set = {};
+
+local SetMT = {__index = function(t, key, ...) return Set[key] or Linq.Enumerable[key]; end};
+
+--- Initializes a new instance of the {@see Set} class.
+--- @param source table|nil
+--- @return Set @The new instance of {@see Set}.
+function Set.New(source, comparer)
+    assert(source == nil or type(source) == "table");
+
+    local set = setmetatable({}, SetMT);
+
+    set.source = {};
+
+    set.Comparer = comparer;
+    set.Length = 0;
+
+    source = Linq.Enumerable.IsEnumerable(source) and source:ToTable() or source;
+    for _, v in pairs(source or {}) do set:Add(v); end
+
+    set:_SetIterator();
+
+    return set;
+end
+
+--- For private use only.
+function Set:_FindItemKey(item)
+    if (self.Comparer) then
+        for key, value in pairs(self.source) do if (self.Comparer(value, item)) then return key; end end
+    else
+        if (self.source[item]) then return item; end
+    end
+
+    return nil;
+end
+
+--- Iterates over all the elements in an array.
+function Set:_SetIterator()
+    self.getIterator = function()
+        local index = 0;
+        local key, value;
+        if (self.comparer) then
+            -- With a comparer we are not using a real set (slower)
+            return function()
+                key, value = next(self.source, key);
+                if (not key) then return; end
+                index = index + 1;
+                return index, value;
+            end
+        else
+            -- Without comparer we are using a real set (faster)
+            return function()
+                key = next(self.source, key);
+                if (not key) then return; end
+                index = index + 1;
+                return index, key;
+            end
+        end
+    end;
+end
+
+--- Adds the specified element to a set.
+--- @param item any @The element to add to the set.
+--- @return boolean @`true` if the element is added to the set; `false` if the element is already present.
+function Set:Add(item)
+    assert(item ~= nil, "Bad argument #1 to 'Add': 'item' cannot be a nil value.");
+
+    if (self.Comparer) then
+        for _, value in pairs(self.source) do
+            if (self.Comparer(value, item)) then
+                -- The item already exists in the set
+                return false;
+            end
+        end
+        -- This item does not exist in the set
+        tinsert(self.source, item);
+        self.Length = self.Length + 1;
+        return true;
+    else
+        if (self.source[item]) then
+            -- The item already exists in the set
+            return false;
+        else
+            -- This item does not exist in the set
+            self.source[item] = true;
+            self.Length = self.Length + 1;
+            return true;
+        end
+    end
+end
+
+--- Removes all elements from a set.
+function Set:Clear()
+    wipe(self.source);
+    self.Length = 0;
+end
+
+--- Determines whether the set contains the specified element.
+--- @param item any @The element to locate in the set.
+--- @return boolean @`true` if the set contains the specified element; otherwise, `false`.
+function Set:Contains(item)
+    if (self.Length == 0) then
+        return false;
+    else
+        return self:_FindItemKey(item) ~= nil;
+    end
+end
+
+--- Removes the specified element from a set.
+--- @param item any @The element to remove.
+--- @return boolean @`true` if the element is successfully found and removed; otherwise, `false`. This method returns `false` if item is not found in the set.
+function Set:Remove(item)
+    assert(item ~= nil, "Bad argument #1 to 'Remove': 'item' cannot be a nil value.");
+
+    if (self.Comparer) then
+        for key, value in pairs(self.source) do
+            if (self.Comparer(value, item)) then
+                -- The item exists in the set
+                tremove(self.source, key);
+                self.Length = self.Length - 1;
+                return true;
+            end
+        end
+        -- This item does not exist in the set
+        return false;
+    else
+        if (self.source[item]) then
+            -- The item exists in the set
+            self.source[item] = nil;
+            self.Length = self.Length - 1;
+            return true;
+        else
+            -- This item does not exist in the set
+            return false;
+        end
+    end
 end
 
 -- *********************************************************************************************************************
@@ -1231,6 +1355,6 @@ end
 Linq.Enumerable = Enumerable;
 Linq.OrderedEnumerable = OrderedEnumerable;
 Linq.ReadOnlyCollection = ReadOnlyCollection;
-Linq._Set = Set;
+Linq.Set = Set;
 
 return Linq;

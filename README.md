@@ -45,14 +45,17 @@ You can also use [`LibStub`](https://www.wowace.com/projects/libstub) to use thi
 ## Author: Draghos
 ## Version: 0.0.1
 
-# Import linq.lua first
+# You need LibStub first
+Libs/LibStub/LibStub.lua
+
+# Import linq.lua
 Libs/Linq/linq.lua
 
 # Then import optional collections
 Libs/Linq/list.lua
 Libs/Linq/hashSet.lua
 
-# Lastly you can import the files in which you want to use Linq
+# Lastly import the files in which you want to use Linq
 MyAddon.lua
 ```
 
@@ -62,7 +65,7 @@ MyAddon.lua
 -- Import Linq using LibStub
 local Linq = LibStub("Linq");
 
--- Use Enumerable and the collections you have imported
+-- You can now use the collections you have imported and Enumerable operations
 local list = Linq.List.New(Linq.Enumerable.Range(1, 5));
 ```
 
@@ -138,7 +141,7 @@ result = query:Sum();
 It is possible to use another enumerable as an argument for an operation:
 
 ```lua
-local first = {1, 2, 3, 4, 5};
+local first = List.New({1, 2, 3, 4, 5});
 local second = List.New({6, 7, 8});
 
 local query = Enumerable.From(first):Concat(second);
@@ -175,7 +178,9 @@ This type provides some interesting mathematical methods to add or remove items 
 
 #### Dictionary
 
-The `Dictionary` type is not yet implemented.
+The `Dictionary` is a collection of key/value pairs in which the order of elements is respected as they are added into the collection. Each key must be unique according to the default equality operator (`==`) or a comparison function.
+
+**Note:** You need to import `List` in order to use the `Dictionary`.
 
 ### Limitations
 
@@ -191,7 +196,7 @@ Enumerable.From(t):Sum(); -- Use this instead
 
 ### Enumerable
 
-| Name                | Immediate | Deferred | Static |
+| Name                | Immediate | Deferred |  Type  |
 | ------------------- | :-------: | :------: | :----: |
 | Aggregate           |     X     |          |        |
 | All                 |     X     |          |        |
@@ -205,11 +210,11 @@ Enumerable.From(t):Sum(); -- Use this instead
 | Distinct            |           |    X     |        |
 | ElementAt           |     X     |          |        |
 | ElementAtOrDefault  |     X     |          |        |
-| Empty               |           |          |   X    |
+| Empty               |           |          | Static |
 | Except              |           |    X     |        |
 | First               |     X     |          |        |
 | FirstOrDefault      |     X     |          |        |
-| From                |           |          |   X    |
+| From                |           |          | Static |
 | GroupBy             |           |    X     |        |
 | GroupJoin           |           |    X     |        |
 | Intersect           |           |    X     |        |
@@ -220,8 +225,8 @@ Enumerable.From(t):Sum(); -- Use this instead
 | Min                 |     X     |          |        |
 | OrderBy             |           |    X     |        |
 | OrderByDescending   |           |    X     |        |
-| Range               |           |          |   X    |
-| Repeat              |           |          |   X    |
+| Range               |           |          | Static |
+| Repeat              |           |          | Static |
 | Reverse             |           |    X     |        |
 | Select              |           |    X     |        |
 | SelectMany          |           |    X     |        |
@@ -233,7 +238,7 @@ Enumerable.From(t):Sum(); -- Use this instead
 | Take                |           |    X     |        |
 | TakeWhile           |           |    X     |        |
 | ToArray             |     X     |          |        |
-| <s>ToDictionary</s> |           |          |        |
+| ToDictionary        |     X     |          |        |
 | ToHashSet           |     X     |          |        |
 | ToList              |     X     |          |        |
 | <s>ToLookup</s>     |           |          |        |
@@ -243,62 +248,78 @@ Enumerable.From(t):Sum(); -- Use this instead
 
 ### OrderedEnumerable
 
-| Name             | Immediate | Deferred | Static |
-| ---------------- | :-------: | :------: | :----: |
-| ThenBy           |           |    X     |        |
-| ThenByDescending |           |    X     |        |
+| Name             | Immediate | Deferred | Type |
+| ---------------- | :-------: | :------: | :--: |
+| ThenBy           |           |    X     |      |
+| ThenByDescending |           |    X     |      |
 
 ### List
 
-| Name                 | Modify | No side-effect | Static |
-| -------------------- | :----: | :------------: | :----: |
-| Add                  |   X    |                |        |
-| AddRange             |   X    |                |        |
-| Clear                |   X    |                |        |
-| <s>Contains</s>      |        |                |        |
-| <s>CopyTo</s>        |        |                |        |
-| <s>Exists</s>        |        |                |        |
-| <s>Find</s>          |        |                |        |
-| <s>FindAll</s>       |        |                |        |
-| <s>FindIndex</s>     |        |                |        |
-| <s>FindLast</s>      |        |                |        |
-| <s>FindLastIndex</s> |        |                |        |
-| <s>ForEach</s>       |        |                |        |
-| <s>GetEnumerator</s> |        |                |        |
-| <s>GetRange</s>      |        |                |        |
-| <s>IndexOf</s>       |        |                |        |
-| <s>Insert</s>        |        |                |        |
-| <s>InsertRange</s>   |        |                |        |
-| <s>LastIndexOf</s>   |        |                |        |
-| Length               |        |       X        |        |
-| New                  |        |                |   X    |
-| <s>Remove</s>        |        |                |        |
-| <s>RemoveAll</s>     |        |                |        |
-| RemoveAt             |   X    |                |        |
-| <s>RemoveRange</s>   |        |                |        |
-| <s>Reverse</s>       |        |                |        |
-| <s>Sort</s>          |        |                |        |
-| <s>ToArray</s>       |        |                |        |
-| <s>TrueForAll</s>    |        |                |        |
+| Name                 | Side-effect |   Type   |
+| -------------------- | :---------: | :------: |
+| Add                  |     Yes     |          |
+| AddRange             |     Yes     |          |
+| Clear                |     Yes     |          |
+| <s>Contains</s>      |             |          |
+| <s>CopyTo</s>        |             |          |
+| <s>Exists</s>        |             |          |
+| <s>Find</s>          |             |          |
+| <s>FindAll</s>       |             |          |
+| <s>FindIndex</s>     |             |          |
+| <s>FindLast</s>      |             |          |
+| <s>FindLastIndex</s> |             |          |
+| <s>ForEach</s>       |             |          |
+| <s>GetRange</s>      |             |          |
+| <s>IndexOf</s>       |             |          |
+| <s>Insert</s>        |             |          |
+| <s>InsertRange</s>   |             |          |
+| <s>LastIndexOf</s>   |             |          |
+| Length               |             | Property |
+| New                  |             |  Static  |
+| <s>Remove</s>        |             |          |
+| <s>RemoveAll</s>     |             |          |
+| RemoveAt             |     Yes     |          |
+| <s>RemoveRange</s>   |             |          |
+| <s>Reverse</s>       |             |          |
+| <s>Sort</s>          |             |          |
+| <s>ToArray</s>       |             |          |
+| <s>TrueForAll</s>    |             |          |
 
 ### HashSet
 
-| Name                      | Modify | No side-effect | Static |
-| ------------------------- | :----: | :------------: | :----: |
-| Add                       |   X    |                |        |
-| Clear                     |   X    |                |        |
-| Contains                  |        |       X        |        |
-| <s>CopyTo</s>             |        |                |        |
-| <s>GetEnumerator</s>      |        |                |        |
-| Length                    |        |       X        |        |
-| New                       |        |                |   X    |
-| Remove                    |   X    |                |        |
-| <s>RemoveWhere</s>        |        |                |        |
-| <s>IsProperSubsetOf</s>   |        |                |        |
-| <s>IsProperSupersetOf</s> |        |                |        |
-| <s>IsSubsetOf</s>         |        |                |        |
-| <s>IsSupersetOf</s>       |        |                |        |
-| <s>Overlaps</s>           |        |                |        |
-| SymmetricExceptWith       |   X    |                |        |
-| <s>TryGetValue</s>        |        |                |        |
-| UnionWith                 |   X    |                |        |
+| Name                      | Side-effect |   Type   |
+| ------------------------- | :---------: | :------: |
+| Add                       |     Yes     |          |
+| Clear                     |     Yes     |          |
+| Contains                  |             |          |
+| Comparer                  |             | Property |
+| <s>CopyTo</s>             |             |          |
+| Length                    |             | Property |
+| New                       |             |  Static  |
+| Remove                    |     Yes     |          |
+| <s>RemoveWhere</s>        |             |          |
+| <s>IsProperSubsetOf</s>   |             |          |
+| <s>IsProperSupersetOf</s> |             |          |
+| <s>IsSubsetOf</s>         |             |          |
+| <s>IsSupersetOf</s>       |             |          |
+| <s>Overlaps</s>           |             |          |
+| SymmetricExceptWith       |     Yes     |          |
+| <s>TryGetValue</s>        |             |          |
+| UnionWith                 |     Yes     |          |
+
+### Dictionary
+
+| Name          | Side-effect |   Type   |
+| ------------- | :---------: | :------: |
+| Add           |     Yes     |          |
+| Clear         |     Yes     |          |
+| ContainsKey   |             |          |
+| ContainsValue |             |          |
+| Comparer      |             | Property |
+| Length        |             | Property |
+| New           |             |  Static  |
+| Keys          |             | Property |
+| Remove        |     Yes     |          |
+| TryAdd        |     Yes     |          |
+| TryGetValue   |             |          |
+| Values        |             | Property |
