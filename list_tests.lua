@@ -4,6 +4,9 @@ require "list";
 --- @type List|ReadOnlyCollection|OrderedEnumerable|Enumerable
 local List = Linq.List;
 
+--- @type Enumerable
+local Enumerable = Linq.Enumerable;
+
 describe("List:Add", function()
     it("adds an item", function()
         local list = List.New({"a", 12, false, {}});
@@ -38,6 +41,13 @@ describe("List:AddRange", function()
         local list = List.New({"a", 12, false, {}});
         assert.equal(4, list.Length);
         list:AddRange({1, 12, "a", 3, 4, {}, {}, true, false});
+        assert.equal(13, list.Length);
+    end);
+
+    it("adds items from an enumerable", function()
+        local list = List.New({"a", 12, false, {}});
+        assert.equal(4, list.Length);
+        list:AddRange(Enumerable.From({1, 12, "a", 3, 4, {}, {}, true, false}));
         assert.equal(13, list.Length);
     end);
 

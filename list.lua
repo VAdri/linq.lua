@@ -36,11 +36,7 @@ function List.New(source)
     list.source = {};
 
     -- Shallow copy because we don't want to modify the source sequence
-    if (Linq.Enumerable.IsEnumerable(source)) then
-        for _, v in source:GetEnumerator() do list:Add(v); end
-    else
-        for _, v in pairs(source or {}) do list:Add(v); end
-    end
+    list:AddRange(source or {});
 
     list:_ArrayIterator();
 
@@ -58,7 +54,13 @@ end
 
 --- Adds the elements of the specified collection to the end of the {@see List}.
 --- @param collection table @The collection whose elements should be added to the end of the {@see List}.
-function List:AddRange(collection) for _, v in pairs(collection) do self:Add(v); end end
+function List:AddRange(collection)
+    if (Linq.Enumerable.IsEnumerable(collection)) then
+        for _, v in collection:GetEnumerator() do self:Add(v); end
+    else
+        for _, v in pairs(collection) do self:Add(v); end
+    end
+end
 
 --- Removes all elements from the {@see List}.
 function List:Clear()

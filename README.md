@@ -2,9 +2,9 @@
 
 This project is an implementation of the [LINQ](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/) system in Lua.
 
-LINQ (Language-Integrated Query) is a library integrated in the .NET framework that adds some consitent and powerful query features on enumerable types.
+LINQ (Language-Integrated Query) is a library originally in the .NET framework that adds some consitent and powerful query features on enumerable types.
 
-The aim is to keep an API that is close to the original and to use the same [deferred execution](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/classification-of-standard-query-operators-by-manner-of-execution#deferred) methods with CPU and memory usage efficiency in mind.
+The aim of this project is to keep an API that is close to the original and to use the same [deferred execution](https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/linq/classification-of-standard-query-operators-by-manner-of-execution#deferred) methods with CPU and memory usage efficiency in mind.
 
 ## Usage
 
